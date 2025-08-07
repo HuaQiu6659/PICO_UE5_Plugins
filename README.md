@@ -33,4 +33,4 @@
 
 
 ## Note:
-- This project integrates Pico Unreal Integration SDK 3.2.0 plugin for UE 5.5.4. If you are using other version Unreal engine, you will need to integrate the corresponding UE version plugin at [here.](https://developer.picoxr.com/zh/resources/#sdk)
+- This project integrates Pico Unreal Integration SDK v3.2.0 plugin for UE 5.5.4. If you are using other version Unreal engine, you will need to integrate the corresponding UE version plugin at [here.](https://developer.picoxr.com/zh/resources/#sdk)
