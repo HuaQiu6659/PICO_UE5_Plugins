@@ -1,0 +1,23 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "MotionPostbacker",
+	"Description": "PicoTracker数据回传",
+	"Category": "Motion Capture",
+	"CreatedBy": "",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"EngineVersion": "5.5.0",
+	"CanContainContent": true,
+	"Installed": true,
+	"Modules": [
+		{
+			"Name": "MotionPostbacker",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
