@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Enums.h"
+#include "TrackerData.h"
 
 /**
  * 
@@ -39,4 +40,11 @@ public:
 	/// <param name="motionType"> Trajectory 或 Cpr </param>
 	/// <returns> command Json </returns>
 	static const FString& AnalysisCommand(EMotionType motionType);
+
+	/// <summary>
+	/// 追踪器数据上报（数组）
+	/// </summary>
+	/// <param name="trackers"> FTrackerData 数组 </param>
+	/// <returns> command Json </returns>
+	static const FString& TrackerDatas(const TArray<FTrackerData>& trackers);
 };

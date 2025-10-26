@@ -22,3 +22,13 @@ enum class EMotionType : uint8 {
 	Trajectory,
 	Cpr
 };
+
+/*
+ * 连接状态
+ */
+UENUM(BlueprintType)
+enum class EConnectorState : uint8 {
+	Unconnect,
+	Connecting,
+	Connected
+};

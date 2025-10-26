@@ -9,7 +9,11 @@
 #include "Sockets.h"
 #include "Networking.h"
 #include "Containers/Queue.h"
+#include "Enums.h"
+#include "TrackerData.h"
 #include "PBConnector.generated.h"
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConnectorStateChanged, EConnectorState, state);
 
 UCLASS()
 class MOTIONPOSTBACKER_API APBConnector : public AActor
@@ -47,6 +51,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Socket")
 		void EnqueueJson(const FString& JsonString);
 
+	UFUNCTION(BlueprintCallable, Category = "Socket")
+		void SendGlobalConfigCommand(const FString& clipperSn, const FString& dummySn);
+
+	UFUNCTION(BlueprintCallable, Category = "Socket")
+		void SendTrackerDatas(const TArray<FTrackerData> datas);
+
+	UPROPERTY(BlueprintAssignable, Category = "Socket")
+		FOnConnectorStateChanged onConnectorStateChanged;
+
 private:
 	/*---------------------Socket---------------------*/
 	FRunnableThread* threadConnect;
@@ -55,10 +68,15 @@ private:
 	// 发送队列与配置
 	bool bUseUdp = false;
 	bool bLogMessage = false;
-	TQueue<FString> SendQueue;
+	TQueue<FString> sendQueue;
 
-	FTimerHandle					countdownTimerHandle;
-	FTimerDelegate					onUpdate;
+	FTimerHandle                    countdownTimerHandle;
+	FTimerDelegate                  onUpdate;
+	FTimerHandle                    connectTimeoutTimerHandle;
+	FString                         connectAddress;
+	int32                           connectPort;
+	bool                            bConnectedNotified = false;
 
-	void							ThreadCreate();
+	void                            ThreadCreate();
+	void                            OnConnectTimeout();
 };

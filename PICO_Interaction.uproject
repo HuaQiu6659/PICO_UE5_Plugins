@@ -40,13 +40,14 @@
 		{
 			"Name": "PICOLivePreview",
 			"Enabled": true
+		},
+		{
+			"Name": "MotionPostbacker",
+			"Enabled": true
 		}
 	],
 	"TargetPlatforms": [
 		"Android",
-		"IOS",
-		"Linux",
-		"Mac",
 		"PS4",
 		"PS5",
 		"Windows",

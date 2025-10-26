@@ -126,3 +126,80 @@ const FString& CommandBuilder::AnalysisCommand(EMotionType motionType)
 	FJsonSerializer::Serialize(root.ToSharedRef(), Writer);
 	return cachedJson;
 }
+
+const FString& CommandBuilder::TrackerDatas(const TArray<FTrackerData>& trackers)
+{
+	static FString cachedJson;
+
+	TSharedPtr<FJsonObject> root = MakeShareable(new FJsonObject());
+	root->SetStringField(TEXT("cmd"), TEXT("trajectoryAnalysis"));
+	root->SetStringField(TEXT("action"), TEXT("trReport"));
+
+	UCommandResolver* resolver = UCommandResolver::GetInstance();
+	const FString bizId = resolver ? resolver->Get(TEXT("track")) : FString();
+	if (!bizId.IsEmpty())
+	{
+		root->SetStringField(TEXT("bizId"), bizId);
+	}
+
+	const int64 TimestampMs = static_cast<int64>((FDateTime::UtcNow() - FDateTime(1970,1,1)).GetTotalMilliseconds());
+	root->SetNumberField(TEXT("stamp"), (double)TimestampMs);
+
+	TArray<TSharedPtr<FJsonValue>> trackersArray;
+	trackersArray.Reserve(trackers.Num());
+
+	for (const FTrackerData& t : trackers)
+	{
+		TSharedPtr<FJsonObject> tObj = MakeShareable(new FJsonObject());
+		tObj->SetStringField(TEXT("sn"), t.sn);
+
+		// lt: [x, y, z]
+		{
+			TArray<TSharedPtr<FJsonValue>> ltArr;
+			ltArr.Add(MakeShareable(new FJsonValueNumber(t.lt.X)));
+			ltArr.Add(MakeShareable(new FJsonValueNumber(t.lt.Y)));
+			ltArr.Add(MakeShareable(new FJsonValueNumber(t.lt.Z)));
+			tObj->SetArrayField(TEXT("lt"), ltArr);
+		}
+
+		// lr: [x, y, z, w]
+		{
+			TArray<TSharedPtr<FJsonValue>> lrArr;
+			lrArr.Add(MakeShareable(new FJsonValueNumber(t.lr.X)));
+			lrArr.Add(MakeShareable(new FJsonValueNumber(t.lr.Y)));
+			lrArr.Add(MakeShareable(new FJsonValueNumber(t.lr.Z)));
+			lrArr.Add(MakeShareable(new FJsonValueNumber(t.lr.W)));
+			tObj->SetArrayField(TEXT("lr"), lrArr);
+		}
+
+		// gt: [x, y, z]
+		{
+			TArray<TSharedPtr<FJsonValue>> gtArr;
+			gtArr.Add(MakeShareable(new FJsonValueNumber(t.gt.X)));
+			gtArr.Add(MakeShareable(new FJsonValueNumber(t.gt.Y)));
+			gtArr.Add(MakeShareable(new FJsonValueNumber(t.gt.Z)));
+			tObj->SetArrayField(TEXT("gt"), gtArr);
+		}
+
+		// gr: [x, y, z, w]
+		{
+			TArray<TSharedPtr<FJsonValue>> grArr;
+			grArr.Add(MakeShareable(new FJsonValueNumber(t.gr.X)));
+			grArr.Add(MakeShareable(new FJsonValueNumber(t.gr.Y)));
+			grArr.Add(MakeShareable(new FJsonValueNumber(t.gr.Z)));
+			grArr.Add(MakeShareable(new FJsonValueNumber(t.gr.W)));
+			tObj->SetArrayField(TEXT("gr"), grArr);
+		}
+
+		tObj->SetBoolField(TEXT("isConfidence"), t.bIsConfidence);
+
+		trackersArray.Add(MakeShareable(new FJsonValueObject(tObj)));
+	}
+
+	root->SetArrayField(TEXT("trackerList"), trackersArray);
+
+	cachedJson.Empty();
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&cachedJson);
+	FJsonSerializer::Serialize(root.ToSharedRef(), Writer);
+	return cachedJson;
+}
