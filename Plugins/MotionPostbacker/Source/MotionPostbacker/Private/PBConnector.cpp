@@ -44,17 +44,15 @@ void APBConnector::Tick(float DeltaTime)
 			GetWorld()->GetTimerManager().ClearTimer(connectTimeoutTimerHandle);
 
 		// 仅在状态首次变为已连接时广播
-		if (!bConnectedNotified)
+		if (!connectedNotified)
 		{
 			onConnectorStateChanged.Broadcast(EConnectorState::Connected);
-			bConnectedNotified = true;
+			connectedNotified = true;
 		}
 	}
+	// 未连接时重置标记，允许下一次连接成功时广播一次
 	else
-	{
-		// 未连接时重置标记，允许下一次连接成功时广播一次
-		bConnectedNotified = false;
-	}
+		connectedNotified = false;
 }
 
 void APBConnector::TryConnectServer(const FString& address, int32 port, bool useUdp, bool logMessage)
@@ -85,7 +83,7 @@ void APBConnector::TryConnectServer(const FString& address, int32 port, bool use
 	bLogMessage = logMessage;
 
 	// 每次开始连接时重置通知标记
-	bConnectedNotified = false;
+	connectedNotified = false;
 
 	// 记录目标地址与端口供超时回调使用
 	connectAddress = address;
@@ -125,12 +123,8 @@ void APBConnector::Stop()
 		td = nullptr;
 	}
 
-	// 停止时清理连接超时定时器
 	GetWorld()->GetTimerManager().ClearTimer(connectTimeoutTimerHandle);
-
-	// 停止时也重置通知标记
-	bConnectedNotified = false;
-
+	connectedNotified = false;
 	onConnectorStateChanged.Broadcast(EConnectorState::Unconnect);
 }
 
@@ -150,9 +144,17 @@ bool APBConnector::SendString(const FString& Message)
 	return ok;
 }
 
-void APBConnector::EnqueueJson(const FString& JsonString)
+void APBConnector::EnqueueJson(const FString& jsonString)
 {
-	sendQueue.Enqueue(JsonString);
+    FString payload = jsonString;
+    if (!payload.EndsWith(TEXT("\r\n")))
+    {
+        // 去除尾部单独的 \r 或 \n，避免形成重复换行符
+        while (payload.Len() > 0 && (payload.EndsWith(TEXT("\r")) || payload.EndsWith(TEXT("\n"))))
+            payload.RemoveAt(payload.Len() - 1, 1, false);
+        payload.Append(TEXT("\r\n"));
+    }
+    sendQueue.Enqueue(payload);
 }
 
 void APBConnector::SendGlobalConfigCommand(const FString& clipperSn, const FString& dummySn)
@@ -183,7 +185,6 @@ void APBConnector::ThreadCreate()
 
 void APBConnector::OnConnectTimeout()
 {
-	// 如果仍未连接成功，广播失败并停止
 	if (!td || !td->IsConnected())
 	{
 		FString msg = FString::Printf(TEXT("连接超时: %s:%d"), *connectAddress, connectPort);

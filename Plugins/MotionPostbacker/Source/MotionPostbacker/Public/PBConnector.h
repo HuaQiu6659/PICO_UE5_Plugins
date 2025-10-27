@@ -75,7 +75,7 @@ private:
 	FTimerHandle                    connectTimeoutTimerHandle;
 	FString                         connectAddress;
 	int32                           connectPort;
-	bool                            bConnectedNotified = false;
+	bool                            connectedNotified = false;
 
 	void                            ThreadCreate();
 	void                            OnConnectTimeout();

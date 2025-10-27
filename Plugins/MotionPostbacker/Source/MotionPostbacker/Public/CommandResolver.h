@@ -21,6 +21,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Motion")
 		static UCommandResolver* GetInstance();
 
+	UFUNCTION(BlueprintCallable, Category = "Motion")
+		const FString& GetBizId();
+
 	UPROPERTY(BlueprintAssignable, Category="Motion")
 		FMessageDelegate onMessageUpdate;
 

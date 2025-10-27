@@ -18,6 +18,11 @@ UCommandResolver* UCommandResolver::GetInstance()
     return Instance;
 }
 
+const FString& UCommandResolver::GetBizId()
+{
+    return idMap[TEXT("tracker")];
+}
+
 void UCommandResolver::Initialize()
 {
     idMap.Empty();

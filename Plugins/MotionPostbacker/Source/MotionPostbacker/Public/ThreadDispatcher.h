@@ -32,10 +32,11 @@ private:
 	bool connected = false;
 	bool logMessage = false;
 	TArray<uint8> receiveData;
+	FString receiveBuffer;
 
 	FSocket* socket; // 原 recvSocket 改为 socket，用于收发
-	TSharedPtr<FInternetAddr> RemoteAddr;
-	void NewData(int32 BytesRead);
+	TSharedPtr<FInternetAddr> remoteAddr;
+	void NewData(int32 bytesRead);
 
 	//TCP
 	void TcpRecv();
