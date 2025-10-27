@@ -39,18 +39,15 @@ void APBConnector::Tick(float DeltaTime)
 
 	if (td && td->IsConnected())
 	{
-		// 仅在定时器仍激活时清理，避免每帧无意义 Clear
 		if (GetWorld()->GetTimerManager().IsTimerActive(connectTimeoutTimerHandle))
 			GetWorld()->GetTimerManager().ClearTimer(connectTimeoutTimerHandle);
 
-		// 仅在状态首次变为已连接时广播
 		if (!connectedNotified)
 		{
 			onConnectorStateChanged.Broadcast(EConnectorState::Connected);
 			connectedNotified = true;
 		}
 	}
-	// 未连接时重置标记，允许下一次连接成功时广播一次
 	else
 		connectedNotified = false;
 }
@@ -79,13 +76,10 @@ void APBConnector::TryConnectServer(const FString& address, int32 port, bool use
 	}
 
 	Stop();
+
 	bUseUdp = useUdp;
 	bLogMessage = logMessage;
-
-	// 每次开始连接时重置通知标记
 	connectedNotified = false;
-
-	// 记录目标地址与端口供超时回调使用
 	connectAddress = address;
 	connectPort = port;
 
@@ -98,8 +92,8 @@ void APBConnector::TryConnectServer(const FString& address, int32 port, bool use
 	onUpdate = FTimerDelegate::CreateUObject(this, &APBConnector::ThreadCreate);
 	GetWorld()->GetTimerManager().SetTimer(countdownTimerHandle, onUpdate, 0.001f, false);
 
-	// 设置5秒连接超时定时器
-	GetWorld()->GetTimerManager().SetTimer(connectTimeoutTimerHandle, this, &APBConnector::OnConnectTimeout, 5.0f, false);
+	// 设置10秒连接超时定时器
+	GetWorld()->GetTimerManager().SetTimer(connectTimeoutTimerHandle, this, &APBConnector::OnConnectTimeout, 10, false);
 }
 
 bool APBConnector::IsConnected() 
@@ -109,23 +103,28 @@ bool APBConnector::IsConnected()
 
 void APBConnector::Stop()
 {
-	if (threadConnect)
-	{
-		threadConnect->Kill(true);
-		delete threadConnect;
-		threadConnect = nullptr;
-	}
+    if (td)
+        td->Stop();
 
-	if (td)
-	{
-		td->Stop();
-		delete td;
-		td = nullptr;
-	}
+    if (threadConnect)
+    {
+        threadConnect->WaitForCompletion();
+        delete threadConnect;
+        threadConnect = nullptr;
+    }
 
-	GetWorld()->GetTimerManager().ClearTimer(connectTimeoutTimerHandle);
-	connectedNotified = false;
-	onConnectorStateChanged.Broadcast(EConnectorState::Unconnect);
+    if (td)
+    {
+        delete td;
+        td = nullptr;
+    }
+
+    if (GetWorld()->GetTimerManager().IsTimerActive(countdownTimerHandle))
+        GetWorld()->GetTimerManager().ClearTimer(countdownTimerHandle);
+
+    GetWorld()->GetTimerManager().ClearTimer(connectTimeoutTimerHandle);
+    connectedNotified = false;
+    onConnectorStateChanged.Broadcast(EConnectorState::Unconnect);
 }
 
 bool APBConnector::SendString(const FString& Message)
@@ -149,7 +148,6 @@ void APBConnector::EnqueueJson(const FString& jsonString)
     FString payload = jsonString;
     if (!payload.EndsWith(TEXT("\r\n")))
     {
-        // 去除尾部单独的 \r 或 \n，避免形成重复换行符
         while (payload.Len() > 0 && (payload.EndsWith(TEXT("\r")) || payload.EndsWith(TEXT("\n"))))
             payload.RemoveAt(payload.Len() - 1, 1, false);
         payload.Append(TEXT("\r\n"));
@@ -172,6 +170,12 @@ void APBConnector::SendTrackerDatas(const TArray<FTrackerData> datas)
 void APBConnector::SendStartCommand(EMotionType motionType)
 {
 	auto jsonStr = CommandBuilder::StartCommand(motionType);
+	EnqueueJson(jsonStr);
+}
+
+void APBConnector::SendEndCommand(EMotionType motionType)
+{
+	auto jsonStr = CommandBuilder::EndCommand(motionType);
 	EnqueueJson(jsonStr);
 }
 

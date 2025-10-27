@@ -31,7 +31,7 @@ bool ThreadDispatcher::Init()
 uint32 ThreadDispatcher::Run()
 {
 	FPlatformProcess::Sleep(0.03f);	
-	UE_LOG(LogTemp, Log, TEXT("Thead start run."));
+	UE_LOG(LogTemp, Log, TEXT("Thread start run."));
 
 	if (udp)
 		UdpRecv();
@@ -44,6 +44,9 @@ uint32 ThreadDispatcher::Run()
 void ThreadDispatcher::Stop()
 {
 	shouldStop = true;
+	connected = false;
+
+	FScopeLock lock(&socketMutex);
 	if (socket)
 	{
 		socket->Close();
@@ -60,6 +63,7 @@ void ThreadDispatcher::TcpRecv()
 	if (!socket)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Socket is null."));
+		UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(TEXT("Socket is null."), EMessageType::Message);
 		return;
 	}
 	socket->SetNonBlocking(false);
@@ -73,12 +77,15 @@ void ThreadDispatcher::TcpRecv()
 	if (!isValid)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Address is not vaild."));
+		UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(TEXT("Address is not valid."), EMessageType::Message);
 		return;
 	}
 
 	if (!socket->Connect(*remoteAddress))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Tcp fail to connect %s:%d."), *address, port);
+		FString msg = FString::Printf(TEXT("Tcp fail to connect %s:%d."), *address, port);
+		UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(msg, EMessageType::Message);
 		return;
 	}
 
@@ -87,6 +94,7 @@ void ThreadDispatcher::TcpRecv()
 	// 连接成功后开始接收数据
 	FPlatformProcess::Sleep(0.1f);
 	uint32 size;
+	connected = true;
 	while (!shouldStop)
 	{
 		if (!socket->HasPendingData(size))
@@ -98,6 +106,7 @@ void ThreadDispatcher::TcpRecv()
 			NewData(bytesRead);
 	}
 	UE_LOG(LogTemp, Log, TEXT("Tcp stop."));
+    connected = false;
 }
 
 void ThreadDispatcher::UdpRecv()
@@ -111,6 +120,7 @@ void ThreadDispatcher::UdpRecv()
 	if (!socket)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Socket is null."));
+		UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(TEXT("Socket is null."), EMessageType::Message);
 		return;
 	}
 	FPlatformProcess::Sleep(0.1f);
@@ -128,6 +138,7 @@ void ThreadDispatcher::UdpRecv()
 			NewData(bytesRead);
 	}
 	UE_LOG(LogTemp, Log, TEXT("Udp stop."));
+    connected = false;
 }
 
 void ThreadDispatcher::NewData(int32 bytesRead)
@@ -135,7 +146,6 @@ void ThreadDispatcher::NewData(int32 bytesRead)
 	// 将本次读取的字节转换为 UTF-8 -> TCHAR 字符串片段
 	FUTF8ToTCHAR converter((const ANSICHAR*)receiveData.GetData(), bytesRead);
 	FString chunk(converter.Length(), converter.Get());
-	connected = true;
 	receiveData.Empty();
 
 	// 累积到缓冲，按'\n'作为分隔符处理粘包/拆包
@@ -183,6 +193,7 @@ void ThreadDispatcher::NewData(int32 bytesRead)
 
 bool ThreadDispatcher::SendString(const FString& message)
 {
+	FScopeLock lock(&socketMutex);
 	if (!socket)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Send failed: socket is null."));
@@ -201,9 +212,12 @@ bool ThreadDispatcher::SendString(const FString& message)
 			bool bValid = false;
 			remoteAddress->SetIp(*address, bValid);
 			remoteAddress->SetPort(port);
+
 			if (!bValid)
 			{
 				UE_LOG(LogTemp, Error, TEXT("Send failed: invalid address %s"), *address);
+				FString msg = FString::Printf(TEXT("Send failed: invalid address %s"), *address);
+				UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(msg, EMessageType::Message);
 				return false;
 			}
 			remoteAddr = remoteAddress;
@@ -213,6 +227,8 @@ bool ThreadDispatcher::SendString(const FString& message)
 		if (!bOk || sent != bytesToSend)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("UDP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
+			FString msg = FString::Printf(TEXT("UDP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
+			UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(msg, EMessageType::Message);
 			return false;
 		}
 		return true;
@@ -223,6 +239,8 @@ bool ThreadDispatcher::SendString(const FString& message)
 		if (!bOk || sent != bytesToSend)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("TCP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
+			FString msg = FString::Printf(TEXT("TCP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
+			UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(msg, EMessageType::Message);
 			return false;
 		}
 		return true;

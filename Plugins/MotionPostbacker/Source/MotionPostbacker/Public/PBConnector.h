@@ -55,7 +55,10 @@ public:
 		void SendTrackerDatas(const TArray<FTrackerData> datas); 
 
 	UFUNCTION(BlueprintCallable, Category = "Socket")
-		void SendStartCommand(EMotionType motionType);
+		void SendStartCommand(EMotionType motionType);	
+	
+	UFUNCTION(BlueprintCallable, Category = "Socket")
+		void SendEndCommand(EMotionType motionType);
 
 	UPROPERTY(BlueprintAssignable, Category = "Socket")
 		FOnConnectorStateChanged onConnectorStateChanged;
@@ -70,8 +73,8 @@ private:
 	bool bLogMessage = false;
 	TQueue<FString> sendQueue;
 
-	FTimerHandle                    countdownTimerHandle;
 	FTimerDelegate                  onUpdate;
+	FTimerHandle                    countdownTimerHandle;
 	FTimerHandle                    connectTimeoutTimerHandle;
 	FString                         connectAddress;
 	int32                           connectPort;

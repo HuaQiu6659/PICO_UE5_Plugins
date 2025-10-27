@@ -18,19 +18,24 @@ UCommandResolver* UCommandResolver::GetInstance()
     return Instance;
 }
 
-const FString& UCommandResolver::GetBizId()
+FString UCommandResolver::GetBizId()
 {
-    return idMap[TEXT("tracker")];
+    return Get(TEXT("track"));
 }
 
 void UCommandResolver::Initialize()
 {
     idMap.Empty();
 }
+
 void UCommandResolver::Set(const FString& key, const FString& value) 
 {
     FScopeLock lock(&idMapMutex);
-    idMap.Add(key, value);
+    const FString* found = idMap.Find(key);
+    if (found)
+        idMap[key] = value;
+    else
+        idMap.Add(key, value);
 }
 
 FString UCommandResolver::Get(const FString& key)

@@ -7,6 +7,7 @@
 #include "../Source/Runtime/Core/Public/HAL/Runnable.h"
 #include "../Source/Runtime/Sockets/Public/Sockets.h"
 #include "Networking.h"
+#include "HAL/CriticalSection.h"
 
 class MOTIONPOSTBACKER_API ThreadDispatcher : public FRunnable
 {
@@ -27,16 +28,17 @@ private:
 
 	FString address;
 	int port;
-	bool udp = false;
-	bool shouldStop = false;
-	bool connected = false;
-	bool logMessage = false;
-	TArray<uint8> receiveData;
-	FString receiveBuffer;
+    bool udp = false;
+    bool shouldStop = false;
+    bool connected = false;
+    bool logMessage = false;
+    TArray<uint8> receiveData;
+    FString receiveBuffer;
 
-	FSocket* socket; // 原 recvSocket 改为 socket，用于收发
-	TSharedPtr<FInternetAddr> remoteAddr;
-	void NewData(int32 bytesRead);
+    FSocket* socket = nullptr;
+    FCriticalSection socketMutex;
+    TSharedPtr<FInternetAddr> remoteAddr;
+    void NewData(int32 bytesRead);
 
 	//TCP
 	void TcpRecv();
