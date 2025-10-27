@@ -8,9 +8,10 @@
 #include "HAL/CriticalSection.h"
 #include "Runtime/Json/Public/Dom/JsonObject.h"
 #include "Runtime/Core/Public/Templates/SharedPointer.h"
+#include "Enums.h"
 #include "CommandResolver.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMotionUpdate, const FString&, Message);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FMessageDelegate, const FString&, message, EMessageType, messageType);
 
 UCLASS()
 class MOTIONPOSTBACKER_API UCommandResolver : public UObject
@@ -21,7 +22,7 @@ public:
 		static UCommandResolver* GetInstance();
 
 	UPROPERTY(BlueprintAssignable, Category="Motion")
-		FOnMotionUpdate onMotionUpdate;
+		FMessageDelegate onMessageUpdate;
 
 	void Resolve(const FString& json);
 	void Set(const FString& key, const FString& value);

@@ -76,7 +76,7 @@ void APBConnector::TryConnectServer(const FString& address, int32 port, bool use
 
 		FString warn = FString::Printf(TEXT("连接失败: %s:%d，原因：%s"), *address, port, *reason);
 		UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-		UCommandResolver::GetInstance()->onMotionUpdate.Broadcast(warn);
+		UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(warn, EMessageType::Message);
 		return;
 	}
 
@@ -94,7 +94,7 @@ void APBConnector::TryConnectServer(const FString& address, int32 port, bool use
 	onConnectorStateChanged.Broadcast(EConnectorState::Connecting);
 
 	FString info = FString::Printf(TEXT("尝试连接服务器 %s:%d"), *address, port);
-	UCommandResolver::GetInstance()->onMotionUpdate.Broadcast(info);
+	UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(info, EMessageType::Message);
 
 	td = new ThreadDispatcher(address, port, useUdp, logMessage);
 	onUpdate = FTimerDelegate::CreateUObject(this, &APBConnector::ThreadCreate);
@@ -188,7 +188,7 @@ void APBConnector::OnConnectTimeout()
 	{
 		FString msg = FString::Printf(TEXT("连接超时: %s:%d"), *connectAddress, connectPort);
 		UE_LOG(LogTemp, Warning, TEXT("%s"), *msg);
-		UCommandResolver::GetInstance()->onMotionUpdate.Broadcast(msg);
+		UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(msg, EMessageType::Message);
 		Stop();
 	}
 }

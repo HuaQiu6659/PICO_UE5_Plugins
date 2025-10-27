@@ -32,3 +32,13 @@ enum class EConnectorState : uint8 {
 	Connecting,
 	Connected
 };
+
+
+/*
+ * 消息类型
+ */
+UENUM(BlueprintType)
+enum class EMessageType : uint8 {
+	AnalysisResult,
+	Message
+};

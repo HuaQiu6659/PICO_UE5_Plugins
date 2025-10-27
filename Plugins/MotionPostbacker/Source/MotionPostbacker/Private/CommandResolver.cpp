@@ -42,7 +42,7 @@ void UCommandResolver::Resolve(const FString& json)
     if (!FJsonSerializer::Deserialize(reader, jsonObject) || !jsonObject.IsValid())
     {
         FString err = FString::Printf(TEXT("Resolve: 无法解析为合法的 JSON: %s"), *json);
-        onMotionUpdate.Broadcast(err);
+        onMessageUpdate.Broadcast(err, EMessageType::Message);
         return;
     }
 
@@ -75,7 +75,7 @@ void UCommandResolver::OnRescueAppConfig(const TSharedPtr<FJsonObject>& json)
     else
         uiText = FString::Printf(TEXT("配置失败, %s"), *msg);
     UE_LOG(LogTemp, Log, TEXT("%s"), *uiText);
-    onMotionUpdate.Broadcast(uiText);
+    onMessageUpdate.Broadcast(uiText, EMessageType::Message);
 }
 
 // -------------------------- Trajectory --------------------------
@@ -92,7 +92,7 @@ void UCommandResolver::OnTrajectoryAnalysis(const TSharedPtr<FJsonObject>& json)
     {
         FString result = FString::Printf(TEXT("无菌钳\n错误码: %d\nAction: %s\nErr: %s"), code, *action, *msg);
         UE_LOG(LogTemp, Warning, TEXT("%s"), *result);
-        onMotionUpdate.Broadcast(result);
+        onMessageUpdate.Broadcast(result, EMessageType::Message);
         return;
     }
 
@@ -108,7 +108,7 @@ void UCommandResolver::OnTrajectoryAnalysis(const TSharedPtr<FJsonObject>& json)
     {
         const FString warn = FString::Printf(TEXT("无菌钳\n未知子指令: %s"), *action);
         UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-        onMotionUpdate.Broadcast(warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
     }
 }
 
@@ -119,7 +119,7 @@ void UCommandResolver::OnTrajectoryAnalysis_Begin(const TSharedPtr<FJsonObject>&
     {
         const FString warn = TEXT("OnTrajectoryAnalysis_Begin: invalid data");
         UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-        onMotionUpdate.Broadcast(warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
     FString bizId;
@@ -128,7 +128,7 @@ void UCommandResolver::OnTrajectoryAnalysis_Begin(const TSharedPtr<FJsonObject>&
     {
         const FString info = FString::Printf(TEXT("Trajectory Begin bizId=%s"), *bizId);
         UE_LOG(LogTemp, Log, TEXT("%s"), *info);
-        onMotionUpdate.Broadcast(info);
+        onMessageUpdate.Broadcast(info, EMessageType::Message);
     }
 }
 
@@ -139,12 +139,12 @@ void UCommandResolver::OnTrajectoryAnalysis_Stop(const TSharedPtr<FJsonObject>& 
     {
         const FString warn = TEXT("OnTrajectoryAnalysis_Stop: invalid data");
         UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-        onMotionUpdate.Broadcast(warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
 
     UE_LOG(LogTemp, Log, TEXT("无菌钳轨迹分析: 已停止"));
-    onMotionUpdate.Broadcast(TEXT("无菌钳轨迹分析: 已停止"));
+    onMessageUpdate.Broadcast(TEXT("无菌钳轨迹分析: 已停止"), EMessageType::Message);
 }
 
 void UCommandResolver::OnTrajectoryAnalysis_TrReport(const TSharedPtr<FJsonObject>& json)
@@ -154,7 +154,7 @@ void UCommandResolver::OnTrajectoryAnalysis_TrReport(const TSharedPtr<FJsonObjec
     {
         const FString warn = TEXT("OnTrajectoryAnalysis_TrReport: invalid data");
         UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-        onMotionUpdate.Broadcast(warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
 
@@ -168,7 +168,7 @@ void UCommandResolver::OnTrajectoryAnalysis_Result(const TSharedPtr<FJsonObject>
     {
         const FString warn = TEXT("OnTrajectoryAnalysis_Result: invalid data");
         UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-        onMotionUpdate.Broadcast(warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
     // 读取 isFinish 与 summary 字段
@@ -191,13 +191,13 @@ void UCommandResolver::OnTrajectoryAnalysis_Result(const TSharedPtr<FJsonObject>
                 sphereDiameter, score);
 
             UE_LOG(LogTemp, Log, TEXT("%s"), *result);
-            onMotionUpdate.Broadcast(result);
+            onMessageUpdate.Broadcast(result, EMessageType::AnalysisResult);
         }
     }
     else
     {
         UE_LOG(LogTemp, Log, TEXT("无菌钳\n轨迹分析: 未完成"));
-        onMotionUpdate.Broadcast(TEXT("无菌钳\n轨迹分析: 未完成"));
+        onMessageUpdate.Broadcast(TEXT("无菌钳\n轨迹分析: 未完成"), EMessageType::AnalysisResult);
     }
 }
 
@@ -208,7 +208,7 @@ void UCommandResolver::OnCprAnalysis(const TSharedPtr<FJsonObject>& json)
     {
         const FString warn = TEXT("OnCprAnalysis: invalid json");
         UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-        onMotionUpdate.Broadcast(warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
     int32 code = 0; FString msg; const TSharedPtr<FJsonObject>* dataPtr = nullptr;
@@ -231,14 +231,14 @@ void UCommandResolver::OnCprAnalysis(const TSharedPtr<FJsonObject>& json)
         {
             const FString warn = FString::Printf(TEXT("OnCprAnalysis: unknown action=%s"), *action);
             UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-            onMotionUpdate.Broadcast(warn);
+            onMessageUpdate.Broadcast(warn, EMessageType::Message);
         }
     }
     else
     {
         const FString warn = FString::Printf(TEXT("OnCprAnalysis: code=%d, msg=%s, action=%s"), code, *msg, *action);
         UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-        onMotionUpdate.Broadcast(warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
     }
 }
 
@@ -249,7 +249,7 @@ void UCommandResolver::OnCprAnalysis_Begin(const TSharedPtr<FJsonObject>& json)
     {
         const FString warn = TEXT("OnCprAnalysis_Begin: invalid data");
         UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-        onMotionUpdate.Broadcast(warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
     FString bizId;
@@ -258,7 +258,7 @@ void UCommandResolver::OnCprAnalysis_Begin(const TSharedPtr<FJsonObject>& json)
     {
         const FString info = FString::Printf(TEXT("CPR Begin bizId=%s"), *bizId);
         UE_LOG(LogTemp, Log, TEXT("%s"), *info);
-        onMotionUpdate.Broadcast(info);
+        onMessageUpdate.Broadcast(info, EMessageType::Message);
     }
 }
 
@@ -269,12 +269,12 @@ void UCommandResolver::OnCprAnalysis_End(const TSharedPtr<FJsonObject>& json)
     {
         const FString warn = TEXT("OnCprAnalysis_End: invalid data");
         UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-        onMotionUpdate.Broadcast(warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
 
     UE_LOG(LogTemp, Log, TEXT("CPR 分析: 已停止"));
-    onMotionUpdate.Broadcast(TEXT("CPR 分析: 已停止"));
+    onMessageUpdate.Broadcast(TEXT("CPR 分析: 已停止"), EMessageType::Message);
 }
 
 void UCommandResolver::OnCprAnalysis_Result(const TSharedPtr<FJsonObject>& json)
@@ -284,7 +284,7 @@ void UCommandResolver::OnCprAnalysis_Result(const TSharedPtr<FJsonObject>& json)
     {
         const FString warn = TEXT("OnCprAnalysis_Result: invalid data");
         UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
-        onMotionUpdate.Broadcast(warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
 
@@ -302,10 +302,10 @@ void UCommandResolver::OnCprAnalysis_Result(const TSharedPtr<FJsonObject>& json)
             scoreNum);
 
         UE_LOG(LogTemp, Log, TEXT("%s"), *result);
-        onMotionUpdate.Broadcast(result);
+        onMessageUpdate.Broadcast(result, EMessageType::AnalysisResult);
     }
 
     const FString infoFinish = FString::Printf(TEXT("OnCprAnalysis_Result: isFinish=%s"), isFinish ? TEXT("true") : TEXT("false"));
     UE_LOG(LogTemp, Log, TEXT("%s"), *infoFinish);
-    onMotionUpdate.Broadcast(infoFinish);
+    onMessageUpdate.Broadcast(infoFinish, EMessageType::Message);
 }
