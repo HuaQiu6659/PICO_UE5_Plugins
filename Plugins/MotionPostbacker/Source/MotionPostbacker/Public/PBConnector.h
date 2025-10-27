@@ -42,12 +42,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Socket")
 		void Stop();
 
-
-	// 1) FString 发送接口
 	UFUNCTION(BlueprintCallable, Category = "Socket")
 		bool SendString(const FString& Message);
 
-	// 3) 数据入队接口
 	UFUNCTION(BlueprintCallable, Category = "Socket")
 		void EnqueueJson(const FString& JsonString);
 
@@ -55,7 +52,10 @@ public:
 		void SendGlobalConfigCommand(const FString& clipperSn, const FString& dummySn);
 
 	UFUNCTION(BlueprintCallable, Category = "Socket")
-		void SendTrackerDatas(const TArray<FTrackerData> datas);
+		void SendTrackerDatas(const TArray<FTrackerData> datas); 
+
+	UFUNCTION(BlueprintCallable, Category = "Socket")
+		void SendStartCommand(EMotionType motionType);
 
 	UPROPERTY(BlueprintAssignable, Category = "Socket")
 		FOnConnectorStateChanged onConnectorStateChanged;

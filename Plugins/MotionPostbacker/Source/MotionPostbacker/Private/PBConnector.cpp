@@ -167,6 +167,12 @@ void APBConnector::SendTrackerDatas(const TArray<FTrackerData> datas)
 	EnqueueJson(jsonStr);
 }
 
+void APBConnector::SendStartCommand(EMotionType motionType)
+{
+	auto jsonStr = CommandBuilder::StartCommand(motionType);
+	EnqueueJson(jsonStr);
+}
+
 void APBConnector::ThreadCreate()
 {
 	if (threadConnect)
