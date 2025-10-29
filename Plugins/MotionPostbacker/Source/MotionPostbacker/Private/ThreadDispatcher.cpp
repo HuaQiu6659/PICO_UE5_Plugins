@@ -24,8 +24,9 @@ ThreadDispatcher::~ThreadDispatcher()
 
 bool ThreadDispatcher::Init()
 {
-	shouldStop = false;
-	return true;
+    shouldStop = false;
+    connected = false;
+    return true;
 }
 
 uint32 ThreadDispatcher::Run()
@@ -43,16 +44,9 @@ uint32 ThreadDispatcher::Run()
 
 void ThreadDispatcher::Stop()
 {
-	shouldStop = true;
-	connected = false;
-
-	FScopeLock lock(&socketMutex);
-	if (socket)
-	{
-		socket->Close();
-		ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(socket);
-		socket = nullptr;
-	}
+    // 仅标记停止并更新连接状态，不在此处销毁 socket，避免与接收循环并发冲突
+    shouldStop = true;
+    connected = false;
 }
 
 void ThreadDispatcher::TcpRecv()
@@ -65,7 +59,8 @@ void ThreadDispatcher::TcpRecv()
 		UE_LOG(LogTemp, Error, TEXT("Socket is null."));
 		return;
 	}
-	socket->SetNonBlocking(false);
+    // 采用非阻塞模式，配合主动轮询连接状态，避免失败时长时间阻塞
+    socket->SetNonBlocking(true);
 
 	// 连接到服务器
 	TSharedRef<FInternetAddr> remoteAddress = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
@@ -79,31 +74,95 @@ void ThreadDispatcher::TcpRecv()
 		return;
 	}
 
-	if (!socket->Connect(*remoteAddress))
-	{
-		UE_LOG(LogTemp, Error, TEXT("Tcp fail to connect %s:%d."), *address, port);
-		FString msg = FString::Printf(TEXT("Tcp fail to connect %s:%d."), *address, port);
-		return;
-	}
+    // 发起连接（非阻塞），然后统一通过状态轮询判定是否真正连接成功
+    socket->Connect(*remoteAddress);
+    const double startSec = FPlatformTime::Seconds();
+    const double timeoutSec = 1.0; // 连接超时时间，缩短失败卡顿
+    while (!shouldStop)
+    {
+        ESocketConnectionState state = socket->GetConnectionState();
+        if (state == ESocketConnectionState::SCS_Connected)
+        {
+            connected = true;
+            break;
+        }
+        if (state == ESocketConnectionState::SCS_ConnectionError)
+        {
+            UE_LOG(LogTemp, Error, TEXT("Tcp connect error to %s:%d"), *address, port);
+            FString msg = FString::Printf(TEXT("Tcp connect error to %s:%d"), *address, port);
+            // 连接失败，关闭套接字并返回
+            FScopeLock lock(&socketMutex);
+            if (socket)
+            {
+                socket->Close();
+                ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(socket);
+                socket = nullptr;
+            }
+            return;
+        }
+
+        // 超时
+        if (FPlatformTime::Seconds() - startSec > timeoutSec)
+        {
+            UE_LOG(LogTemp, Error, TEXT("Tcp connect timeout %s:%d"), *address, port);
+            FString msg = FString::Printf(TEXT("Tcp connect timeout %s:%d"), *address, port);
+            // 连接超时，关闭套接字并返回
+            FScopeLock lock(&socketMutex);
+            if (socket)
+            {
+                socket->Close();
+                ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(socket);
+                socket = nullptr;
+            }
+            return;
+        }
+
+        FPlatformProcess::Sleep(0.01f);
+    }
+    if (shouldStop)
+    {
+        // 外部请求停止，清理并退出
+        FScopeLock lock(&socketMutex);
+        if (socket)
+        {
+            socket->Close();
+            ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(socket);
+            socket = nullptr;
+        }
+        return;
+    }
 
 	remoteAddr = remoteAddress;
 
 	// 连接成功后开始接收数据
 	FPlatformProcess::Sleep(0.1f);
 	uint32 size;
-	connected = true;
-	while (!shouldStop)
-	{
-		if (!socket->HasPendingData(size))
-			continue;
+    while (!shouldStop)
+    {
+        if (!socket->HasPendingData(size))
+        {
+            // 无数据时短暂休眠，避免忙等导致高 CPU 或在安卓上触发异常
+            FPlatformProcess::Sleep(0.005f);
+            continue;
+        }
 
 		receiveData.SetNumUninitialized(FMath::Min(size, 65507u));
 		int32 bytesRead = 0;
 		if (socket->Recv(receiveData.GetData(), receiveData.Num(), bytesRead))
 			NewData(bytesRead);
-	}
-	UE_LOG(LogTemp, Log, TEXT("Tcp stop."));
+    }
+    UE_LOG(LogTemp, Log, TEXT("Tcp stop."));
     connected = false;
+    // 在接收循环结束后统一关闭并销毁 socket，保证线程安全
+    {
+        FScopeLock lock(&socketMutex);
+        if (socket)
+        {
+            socket->Close();
+            ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(socket);
+            socket = nullptr;
+        }
+    }
 }
 
 void ThreadDispatcher::UdpRecv()
@@ -121,20 +180,34 @@ void ThreadDispatcher::UdpRecv()
 	}
 	FPlatformProcess::Sleep(0.1f);
 
-	uint32 size;
-	while (!shouldStop)
-	{
-		if (!socket->HasPendingData(size))
-			continue;
+    uint32 size;
+    while (!shouldStop)
+    {
+        if (!socket->HasPendingData(size))
+        {
+            // 无数据时短暂休眠，避免忙等导致高 CPU 或在安卓上触发异常
+            FPlatformProcess::Sleep(0.005f);
+            continue;
+        }
 
 		receiveData.SetNumUninitialized(FMath::Min(size, 65507u));
 		int32 bytesRead = 0;
 		TSharedRef<FInternetAddr> Sender = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
 		if (socket->RecvFrom(receiveData.GetData(), receiveData.Num(), bytesRead, *Sender))
 			NewData(bytesRead);
-	}
-	UE_LOG(LogTemp, Log, TEXT("Udp stop."));
+    }
+    UE_LOG(LogTemp, Log, TEXT("Udp stop."));
     connected = false;
+    // 在接收循环结束后统一关闭并销毁 socket，保证线程安全
+    {
+        FScopeLock lock(&socketMutex);
+        if (socket)
+        {
+            socket->Close();
+            ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(socket);
+            socket = nullptr;
+        }
+    }
 }
 
 void ThreadDispatcher::NewData(int32 bytesRead)
