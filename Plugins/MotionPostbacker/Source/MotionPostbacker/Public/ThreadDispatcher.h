@@ -22,7 +22,7 @@ public:
 	// 发送接口：直接使用本类的 socket
 	bool SendString(const FString& Message);
 
-	bool IsConnected() const { return connected; }
+    bool IsConnected() const { return connected && !shouldStop && socket != nullptr; }
 
 private:
 

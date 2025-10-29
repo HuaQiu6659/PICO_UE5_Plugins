@@ -145,6 +145,9 @@ bool APBConnector::SendString(const FString& Message)
 
 void APBConnector::EnqueueJson(const FString& jsonString)
 {
+	if (jsonString.IsEmpty())
+		return;
+
     FString payload = jsonString;
     if (!payload.EndsWith(TEXT("\r\n")))
     {

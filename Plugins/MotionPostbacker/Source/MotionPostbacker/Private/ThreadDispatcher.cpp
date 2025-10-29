@@ -63,7 +63,6 @@ void ThreadDispatcher::TcpRecv()
 	if (!socket)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Socket is null."));
-		UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(TEXT("Socket is null."), EMessageType::Message);
 		return;
 	}
 	socket->SetNonBlocking(false);
@@ -77,7 +76,6 @@ void ThreadDispatcher::TcpRecv()
 	if (!isValid)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Address is not vaild."));
-		UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(TEXT("Address is not valid."), EMessageType::Message);
 		return;
 	}
 
@@ -85,7 +83,6 @@ void ThreadDispatcher::TcpRecv()
 	{
 		UE_LOG(LogTemp, Error, TEXT("Tcp fail to connect %s:%d."), *address, port);
 		FString msg = FString::Printf(TEXT("Tcp fail to connect %s:%d."), *address, port);
-		UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(msg, EMessageType::Message);
 		return;
 	}
 
@@ -120,7 +117,6 @@ void ThreadDispatcher::UdpRecv()
 	if (!socket)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Socket is null."));
-		UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(TEXT("Socket is null."), EMessageType::Message);
 		return;
 	}
 	FPlatformProcess::Sleep(0.1f);
@@ -143,17 +139,12 @@ void ThreadDispatcher::UdpRecv()
 
 void ThreadDispatcher::NewData(int32 bytesRead)
 {
-	// 将本次读取的字节转换为 UTF-8 -> TCHAR 字符串片段
 	FUTF8ToTCHAR converter((const ANSICHAR*)receiveData.GetData(), bytesRead);
 	FString chunk(converter.Length(), converter.Get());
 	receiveData.Empty();
-
-	// 累积到缓冲，按'\n'作为分隔符处理粘包/拆包
 	receiveBuffer.Append(chunk);
 
-	// 仅处理到最后一个换行符之前的完整消息，尾部残片保留在缓冲中
 	int32 lastNewlineIdx = receiveBuffer.Find(TEXT("\n"), ESearchCase::IgnoreCase, ESearchDir::FromEnd);
-	// 没有完整行可处理，等待下次接收
 	if (lastNewlineIdx == INDEX_NONE)
 		return;
 
@@ -164,7 +155,6 @@ void ThreadDispatcher::NewData(int32 bytesRead)
 	processArea.ParseIntoArray(lines, TEXT("\n"), false);
 	for (FString& line : lines)
 	{
-		// 去除行尾的 '\r'（发送端以 CRLF 结尾时兼容）并修剪空白
 		while (line.Len() > 0 && line.EndsWith(TEXT("\r")))
 			line.RemoveAt(line.Len() - 1, 1, false);
 
@@ -175,14 +165,12 @@ void ThreadDispatcher::NewData(int32 bytesRead)
 		if (logMessage)
 			UE_LOG(LogTemp, Log, TEXT("Socket Recv Line: %s"), *line);
 
-		// 尝试解析为 JSON
 		TSharedPtr<FJsonObject> jsonObject;
 		TSharedRef<TJsonReader<TCHAR>> jsonReader = TJsonReaderFactory<TCHAR>::Create(line);
 		bool isVaild = FJsonSerializer::Deserialize(jsonReader, jsonObject);
 		if (!isVaild || !jsonObject.IsValid())
 			continue;
 
-		// 将合法 JSON 派发到 GameThread
 		AsyncTask(ENamedThreads::GameThread,
 			[json = MoveTemp(line)]()
 			{
@@ -193,11 +181,14 @@ void ThreadDispatcher::NewData(int32 bytesRead)
 
 bool ThreadDispatcher::SendString(const FString& message)
 {
-	FScopeLock lock(&socketMutex);
-	if (!socket)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Send failed: socket is null."));
+    if (message.IsEmpty())
 		return false;
+
+    FScopeLock lock(&socketMutex);
+    if (!socket)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Send failed: socket is null."));
+        return false;
 	}
 
 	FTCHARToUTF8 converter(*message);
@@ -216,8 +207,7 @@ bool ThreadDispatcher::SendString(const FString& message)
 			if (!bValid)
 			{
 				UE_LOG(LogTemp, Error, TEXT("Send failed: invalid address %s"), *address);
-				FString msg = FString::Printf(TEXT("Send failed: invalid address %s"), *address);
-				UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(msg, EMessageType::Message);
+				FString msg = FString::Printf(TEXT("Send failed: invalid address %s"), *address);;
 				return false;
 			}
 			remoteAddr = remoteAddress;
@@ -228,7 +218,6 @@ bool ThreadDispatcher::SendString(const FString& message)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("UDP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
 			FString msg = FString::Printf(TEXT("UDP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
-			UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(msg, EMessageType::Message);
 			return false;
 		}
 		return true;
@@ -240,7 +229,6 @@ bool ThreadDispatcher::SendString(const FString& message)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("TCP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
 			FString msg = FString::Printf(TEXT("TCP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
-			UCommandResolver::GetInstance()->onMessageUpdate.Broadcast(msg, EMessageType::Message);
 			return false;
 		}
 		return true;

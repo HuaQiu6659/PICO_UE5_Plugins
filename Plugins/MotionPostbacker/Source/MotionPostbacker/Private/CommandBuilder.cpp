@@ -68,13 +68,29 @@ const FString& CommandBuilder::EndCommand(EMotionType motionType)
 	switch (motionType)
 	{
 	case EMotionType::Trajectory:
+	{
+		const FString bizId = resolver ? resolver->Get(TEXT("track")) : FString();
+		if (bizId.IsEmpty()) 
+		{ 
+			cachedJson.Empty(); 
+			return cachedJson; 
+		}
 		root->SetStringField(TEXT("cmd"), TEXT("trajectoryAnalysis"));
-		root->SetStringField(TEXT("track"), resolver->Get(TEXT("")));
+		root->SetStringField(TEXT("bizId"), bizId);
 		break;
+	}
 	case EMotionType::Cpr:
+	{
+		const FString bizId = resolver ? resolver->Get(TEXT("cpr")) : FString();
+		if (bizId.IsEmpty()) 
+		{
+			cachedJson.Empty();
+			return cachedJson; 
+		}
 		root->SetStringField(TEXT("cmd"), TEXT("cprAnalysis"));
-		root->SetStringField(TEXT("cpr"), resolver->Get(TEXT("")));
+		root->SetStringField(TEXT("bizId"), bizId);
 		break;
+	}
 	default:
 		UE_LOG(LogTemp, Error, TEXT("EndCommand: unknown motion type %d"), (int32)motionType);
 		root->SetStringField(TEXT("cmd"), TEXT("unknown"));
@@ -104,18 +120,18 @@ const FString& CommandBuilder::AnalysisCommand(EMotionType motionType)
 	// cmd, bizId
 	switch (motionType)
 	{
-	case EMotionType::Trajectory:
-		root->SetStringField(TEXT("cmd"), TEXT("trajectoryAnalysis"));
-		root->SetStringField(TEXT("track"), resolver->Get(TEXT("")));
-		break;
-	case EMotionType::Cpr:
-		root->SetStringField(TEXT("cmd"), TEXT("cprAnalysis"));
-		root->SetStringField(TEXT("cpr"), resolver->Get(TEXT("")));
-		break;
-	default:
-		UE_LOG(LogTemp, Error, TEXT("EndCommand: unknown motion type %d"), (int32)motionType);
-		root->SetStringField(TEXT("cmd"), TEXT("unknown"));
-		break;
+		case EMotionType::Trajectory:
+			root->SetStringField(TEXT("cmd"), TEXT("trajectoryAnalysis"));
+			root->SetStringField(TEXT("track"), resolver->Get(TEXT("")));
+			break;
+		case EMotionType::Cpr:
+			root->SetStringField(TEXT("cmd"), TEXT("cprAnalysis"));
+			root->SetStringField(TEXT("cpr"), resolver->Get(TEXT("")));
+			break;
+		default:
+			UE_LOG(LogTemp, Error, TEXT("EndCommand: unknown motion type %d"), (int32)motionType);
+			root->SetStringField(TEXT("cmd"), TEXT("unknown"));
+			break;
 	}
 
 	// action
