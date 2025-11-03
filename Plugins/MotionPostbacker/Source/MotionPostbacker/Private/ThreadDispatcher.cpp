@@ -9,6 +9,7 @@
 #include "..\Source\Runtime\Json\Public\Dom\JsonObject.h"
 #include "Async/Async.h"
 #include "CommandResolver.h"
+#include "Engine/Engine.h"
 
 ThreadDispatcher::ThreadDispatcher(const FString& address, int32 port, bool useUdp, bool logMessage)
 {
@@ -90,6 +91,7 @@ void ThreadDispatcher::TcpRecv()
         {
             UE_LOG(LogTemp, Error, TEXT("Tcp connect error to %s:%d"), *address, port);
             FString msg = FString::Printf(TEXT("Tcp connect error to %s:%d"), *address, port);
+            AsyncTask(ENamedThreads::GameThread, [text = msg]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 0.016f, FColor::Red, text); });
             // 连接失败，关闭套接字并返回
             FScopeLock lock(&socketMutex);
             if (socket)
@@ -106,6 +108,7 @@ void ThreadDispatcher::TcpRecv()
         {
             UE_LOG(LogTemp, Error, TEXT("Tcp connect timeout %s:%d"), *address, port);
             FString msg = FString::Printf(TEXT("Tcp connect timeout %s:%d"), *address, port);
+            AsyncTask(ENamedThreads::GameThread, [text = msg]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 0.016f, FColor::Yellow, text); });
             // 连接超时，关闭套接字并返回
             FScopeLock lock(&socketMutex);
             if (socket)
@@ -223,6 +226,7 @@ void ThreadDispatcher::NewData(int32 bytesRead)
 
 	FString processArea = receiveBuffer.Left(lastNewlineIdx + 1);
 	receiveBuffer = receiveBuffer.Mid(lastNewlineIdx + 1);
+    AsyncTask(ENamedThreads::GameThread, [text = processArea]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 1, FColor::White, text); });
 
 	TArray<FString> lines;
 	processArea.ParseIntoArray(lines, TEXT("\n"), false);
@@ -277,33 +281,36 @@ bool ThreadDispatcher::SendString(const FString& message)
 			remoteAddress->SetIp(*address, bValid);
 			remoteAddress->SetPort(port);
 
-			if (!bValid)
-			{
-				UE_LOG(LogTemp, Error, TEXT("Send failed: invalid address %s"), *address);
-				FString msg = FString::Printf(TEXT("Send failed: invalid address %s"), *address);;
-				return false;
-			}
-			remoteAddr = remoteAddress;
-		}
+        if (!bValid)
+        {
+            UE_LOG(LogTemp, Error, TEXT("Send failed: invalid address %s"), *address);
+            FString msg = FString::Printf(TEXT("Send failed: invalid address %s"), *address);;
+            AsyncTask(ENamedThreads::GameThread, [text = msg]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 0.016f, FColor::Yellow, text); });
+            return false;
+        }
+        remoteAddr = remoteAddress;
+    }
 
 		bool bOk = socket->SendTo((uint8*)converter.Get(), bytesToSend, sent, *remoteAddr);
-		if (!bOk || sent != bytesToSend)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("UDP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
-			FString msg = FString::Printf(TEXT("UDP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
-			return false;
-		}
-		return true;
-	}
-	else
+        if (!bOk || sent != bytesToSend)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("UDP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
+            FString msg = FString::Printf(TEXT("UDP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
+            AsyncTask(ENamedThreads::GameThread, [text = msg]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 0.016f, FColor::Yellow, text); });
+            return false;
+        }
+        return true;
+    }
+    else
 	{
 		bool bOk = socket->Send((uint8*)converter.Get(), bytesToSend, sent);
-		if (!bOk || sent != bytesToSend)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("TCP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
-			FString msg = FString::Printf(TEXT("TCP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
-			return false;
-		}
-		return true;
-	}
+        if (!bOk || sent != bytesToSend)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("TCP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
+            FString msg = FString::Printf(TEXT("TCP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
+            AsyncTask(ENamedThreads::GameThread, [text = msg]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 0.016f, FColor::Yellow, text); });
+            return false;
+        }
+        return true;
+    }
 }

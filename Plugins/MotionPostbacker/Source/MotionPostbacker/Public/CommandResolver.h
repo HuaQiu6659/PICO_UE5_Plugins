@@ -28,7 +28,6 @@ public:
 		FMessageDelegate onMessageUpdate;
 
 	void Resolve(const FString& json);
-	FString Get(EMotionType key);
 	EMotionType GetCurrentMode() { return currentMode; }
 
 private:
