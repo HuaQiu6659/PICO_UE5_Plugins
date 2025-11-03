@@ -38,6 +38,9 @@ const FString& CommandBuilder::StartCommand(EMotionType motionType)
 	case EMotionType::Cpr:
 		root->SetStringField(TEXT("cmd"), TEXT("cprAnalysis"));
 		break;
+	case EMotionType::ZShape:
+		root->SetStringField(TEXT("cmd"), TEXT("zshapeTrajectoryAnalysis"));
+		break;
 	default:
 		UE_LOG(LogTemp, Error, TEXT("StartCommand: unknown motion type %d"), (int32)motionType);
 		root->SetStringField(TEXT("cmd"), TEXT("unknown"));
@@ -63,32 +66,30 @@ const FString& CommandBuilder::EndCommand(EMotionType motionType)
 
 	TSharedPtr<FJsonObject> root = MakeShareable(new FJsonObject());
 	UCommandResolver* resolver = UCommandResolver::GetInstance();
+	const FString bizId = resolver ? resolver->GetBizId() : FString();
+	if (bizId.IsEmpty())
+	{
+		cachedJson.Empty();
+		return cachedJson;
+	}
+	root->SetStringField(TEXT("bizId"), bizId);
 
 	// cmd, bizId
 	switch (motionType)
 	{
 	case EMotionType::Trajectory:
 	{
-		const FString bizId = resolver ? resolver->Get(TEXT("track")) : FString();
-		if (bizId.IsEmpty()) 
-		{ 
-			cachedJson.Empty(); 
-			return cachedJson; 
-		}
 		root->SetStringField(TEXT("cmd"), TEXT("trajectoryAnalysis"));
-		root->SetStringField(TEXT("bizId"), bizId);
 		break;
 	}
 	case EMotionType::Cpr:
 	{
-		const FString bizId = resolver ? resolver->Get(TEXT("cpr")) : FString();
-		if (bizId.IsEmpty()) 
-		{
-			cachedJson.Empty();
-			return cachedJson; 
-		}
 		root->SetStringField(TEXT("cmd"), TEXT("cprAnalysis"));
-		root->SetStringField(TEXT("bizId"), bizId);
+		break;
+	}
+	case EMotionType::ZShape:
+	{
+		root->SetStringField(TEXT("cmd"), TEXT("zshapeTrajectoryAnalysis"));
 		break;
 	}
 	default:
@@ -116,21 +117,27 @@ const FString& CommandBuilder::AnalysisCommand(EMotionType motionType)
 
 	TSharedPtr<FJsonObject> root = MakeShareable(new FJsonObject());
 	UCommandResolver* resolver = UCommandResolver::GetInstance();
+	const FString bizId = resolver ? resolver->GetBizId() : FString();
+	if (bizId.IsEmpty())
+	{
+		cachedJson.Empty();
+		return cachedJson;
+	}
+
+	root->SetStringField(TEXT("bizId"), bizId);
 
 	// cmd, bizId
 	switch (motionType)
 	{
 		case EMotionType::Trajectory:
 			root->SetStringField(TEXT("cmd"), TEXT("trajectoryAnalysis"));
-			root->SetStringField(TEXT("track"), resolver->Get(TEXT("")));
 			break;
 		case EMotionType::Cpr:
 			root->SetStringField(TEXT("cmd"), TEXT("cprAnalysis"));
-			root->SetStringField(TEXT("cpr"), resolver->Get(TEXT("")));
 			break;
 		default:
 			UE_LOG(LogTemp, Error, TEXT("EndCommand: unknown motion type %d"), (int32)motionType);
-			root->SetStringField(TEXT("cmd"), TEXT("unknown"));
+			root->SetStringField(TEXT("bizId"), TEXT("unknown"));
 			break;
 	}
 
@@ -148,15 +155,30 @@ const FString& CommandBuilder::TrackerDatas(const TArray<FTrackerData>& trackers
 	static FString cachedJson;
 
 	TSharedPtr<FJsonObject> root = MakeShareable(new FJsonObject());
-	root->SetStringField(TEXT("cmd"), TEXT("trajectoryAnalysis"));
+	auto mode = UCommandResolver::GetInstance()->GetCurrentMode();
+	switch (mode)
+	{
+	case EMotionType::Trajectory:
+		root->SetStringField(TEXT("cmd"), TEXT("trajectoryAnalysis"));
+		break;
+
+	case EMotionType::ZShape:
+		root->SetStringField(TEXT("cmd"), TEXT("zshapeTrajectoryAnalysis"));
+		break;
+
+	default:
+		break;
+	}
 	root->SetStringField(TEXT("action"), TEXT("trReport"));
 
 	UCommandResolver* resolver = UCommandResolver::GetInstance();
-	const FString bizId = resolver ? resolver->Get(TEXT("track")) : FString();
-	if (!bizId.IsEmpty())
+	const FString bizId = resolver ? resolver->GetBizId() : FString();
+	if (bizId.IsEmpty())
 	{
-		root->SetStringField(TEXT("bizId"), bizId);
+		cachedJson.Empty();
+		return cachedJson;
 	}
+	root->SetStringField(TEXT("bizId"), bizId);
 
 	const int64 TimestampMs = static_cast<int64>((FDateTime::UtcNow() - FDateTime(1970,1,1)).GetTotalMilliseconds());
 	root->SetNumberField(TEXT("stamp"), (double)TimestampMs);

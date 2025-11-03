@@ -13,36 +13,8 @@ UCommandResolver* UCommandResolver::GetInstance()
     {
         Instance = NewObject<UCommandResolver>(GetTransientPackage(), UCommandResolver::StaticClass());
         Instance->AddToRoot();
-        Instance->Initialize();
     }
     return Instance;
-}
-
-FString UCommandResolver::GetBizId()
-{
-    return Get(TEXT("track"));
-}
-
-void UCommandResolver::Initialize()
-{
-    idMap.Empty();
-}
-
-void UCommandResolver::Set(const FString& key, const FString& value) 
-{
-    FScopeLock lock(&idMapMutex);
-    const FString* found = idMap.Find(key);
-    if (found)
-        idMap[key] = value;
-    else
-        idMap.Add(key, value);
-}
-
-FString UCommandResolver::Get(const FString& key)
-{
-    FScopeLock lock(&idMapMutex);
-    const FString* found = idMap.Find(key);
-    return found ? *found : FString();
 }
 
 void UCommandResolver::Resolve(const FString& json)
@@ -67,6 +39,15 @@ void UCommandResolver::Resolve(const FString& json)
     if (cmd.Equals(TEXT("onCprAnalysis"), ESearchCase::IgnoreCase))
     {
         OnCprAnalysis(jsonObject);
+        return;
+    }
+
+    // Z形轨迹记录回传：兼容服务端不同大小写/前缀
+    if (cmd.Equals(TEXT("onZshapeTrajectoryAnalysis"), ESearchCase::IgnoreCase)
+        || cmd.Equals(TEXT("onZShapeTrajectoryAnalysis"), ESearchCase::IgnoreCase)
+        || cmd.Equals(TEXT("zshapeTrajectoryAnalysis"), ESearchCase::IgnoreCase))
+    {
+        OnZShapeTrajectoryAnalysis(jsonObject);
         return;
     }
 
@@ -132,14 +113,11 @@ void UCommandResolver::OnTrajectoryAnalysis_Begin(const TSharedPtr<FJsonObject>&
         onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
-    FString bizId;
-    (*dataPtr)->TryGetStringField(TEXT("bizId"), bizId);
-    Set(TEXT("track"), bizId);
-    {
-        const FString info = FString::Printf(TEXT("Trajectory Begin bizId=%s"), *bizId);
-        UE_LOG(LogTemp, Log, TEXT("%s"), *info);
-        onMessageUpdate.Broadcast(info, EMessageType::Message);
-    }
+    (*dataPtr)->TryGetStringField(TEXT("bizId"), currentBizId);
+    currentMode = EMotionType::Trajectory;
+    const FString info = FString::Printf(TEXT("Trajectory Begin bizId=%s"), *currentBizId);
+    UE_LOG(LogTemp, Log, TEXT("%s"), *info);
+    onMessageUpdate.Broadcast(info, EMessageType::Message);
 }
 
 void UCommandResolver::OnTrajectoryAnalysis_Stop(const TSharedPtr<FJsonObject>& json)
@@ -262,14 +240,11 @@ void UCommandResolver::OnCprAnalysis_Begin(const TSharedPtr<FJsonObject>& json)
         onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
-    FString bizId;
-    (*dataPtr)->TryGetStringField(TEXT("bizId"), bizId);
-    Set(TEXT("cpr"), bizId);
-    {
-        const FString info = FString::Printf(TEXT("CPR Begin bizId=%s"), *bizId);
-        UE_LOG(LogTemp, Log, TEXT("%s"), *info);
-        onMessageUpdate.Broadcast(info, EMessageType::Message);
-    }
+    (*dataPtr)->TryGetStringField(TEXT("bizId"), currentBizId);
+    currentMode = EMotionType::Cpr;
+    const FString info = FString::Printf(TEXT("CPR Begin bizId=%s"), *currentBizId);
+    UE_LOG(LogTemp, Log, TEXT("%s"), *info);
+    onMessageUpdate.Broadcast(info, EMessageType::Message);
 }
 
 void UCommandResolver::OnCprAnalysis_End(const TSharedPtr<FJsonObject>& json)
@@ -318,4 +293,125 @@ void UCommandResolver::OnCprAnalysis_Result(const TSharedPtr<FJsonObject>& json)
     const FString infoFinish = FString::Printf(TEXT("OnCprAnalysis_Result: isFinish=%s"), isFinish ? TEXT("true") : TEXT("false"));
     UE_LOG(LogTemp, Log, TEXT("%s"), *infoFinish);
     onMessageUpdate.Broadcast(infoFinish, EMessageType::Message);
+}
+
+// -------------------------- ZShape --------------------------
+void UCommandResolver::OnZShapeTrajectoryAnalysis(const TSharedPtr<FJsonObject>& json)
+{
+    if (!json.IsValid())
+    {
+        const FString warn = TEXT("OnZShapeTrajectoryAnalysis: invalid json");
+        UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
+        return;
+    }
+
+    int32 code = 0; FString msg; const TSharedPtr<FJsonObject>* dataPtr = nullptr;
+    json->TryGetNumberField(TEXT("code"), code);
+    json->TryGetStringField(TEXT("msg"), msg);
+    json->TryGetObjectField(TEXT("data"), dataPtr);
+
+    FString action;
+    if (dataPtr && dataPtr->IsValid()) { (*dataPtr)->TryGetStringField(TEXT("action"), action); }
+
+    if (code != SUCCESS_CODE)
+    {
+        const FString result = FString::Printf(TEXT("Z形轨迹记录\n错误码: %d\nAction: %s\nErr: %s"), code, *action, *msg);
+        UE_LOG(LogTemp, Warning, TEXT("%s"), *result);
+        onMessageUpdate.Broadcast(result, EMessageType::Message);
+        return;
+    }
+
+    if (action.Equals(TEXT("begin"), ESearchCase::IgnoreCase))
+        OnZShapeTrajectoryAnalysis_Begin(json);
+    else if (action.Equals(TEXT("stop"), ESearchCase::IgnoreCase))
+        OnZShapeTrajectoryAnalysis_Stop(json);
+    else if (action.Equals(TEXT("trReport"), ESearchCase::IgnoreCase))
+        OnZShapeTrajectoryAnalysis_TrReport(json);
+    else if (action.Equals(TEXT("result"), ESearchCase::IgnoreCase))
+        OnZShapeTrajectoryAnalysis_Result(json);
+    else
+    {
+        const FString warn = FString::Printf(TEXT("Z形轨迹记录\n未知子指令: %s"), *action);
+        UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
+    }
+}
+
+void UCommandResolver::OnZShapeTrajectoryAnalysis_Begin(const TSharedPtr<FJsonObject>& json)
+{
+    const TSharedPtr<FJsonObject>* dataPtr = nullptr;
+    if (!json.IsValid() || !json->TryGetObjectField(TEXT("data"), dataPtr) || !(dataPtr && dataPtr->IsValid()))
+    {
+        const FString warn = TEXT("OnZShapeTrajectoryAnalysis_Begin: invalid data");
+        UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
+        return;
+    }
+    (*dataPtr)->TryGetStringField(TEXT("bizId"), currentBizId);
+    currentMode = EMotionType::ZShape;
+    const FString info = FString::Printf(TEXT("Z形轨迹分析: 开始 bizId=%s"), *currentBizId);
+    UE_LOG(LogTemp, Log, TEXT("%s"), *info);
+    onMessageUpdate.Broadcast(info, EMessageType::Message);
+}
+
+void UCommandResolver::OnZShapeTrajectoryAnalysis_Stop(const TSharedPtr<FJsonObject>& json)
+{
+    UE_LOG(LogTemp, Log, TEXT("Z形轨迹记录: 已停止"));
+    onMessageUpdate.Broadcast(TEXT("Z形轨迹记录: 已停止"), EMessageType::Message);
+}
+
+void UCommandResolver::OnZShapeTrajectoryAnalysis_TrReport(const TSharedPtr<FJsonObject>& json)
+{
+    const TSharedPtr<FJsonObject>* dataPtr = nullptr;
+    if (!json.IsValid() || !json->TryGetObjectField(TEXT("data"), dataPtr) || !(dataPtr && dataPtr->IsValid()))
+    {
+        const FString warn = TEXT("OnZShapeTrajectoryAnalysis_TrReport: invalid data");
+        UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
+        return;
+    }
+    // 按需读取时间戳，当前仅记录日志
+    int64 stampNum = 0; (*dataPtr)->TryGetNumberField(TEXT("stamp"), stampNum);
+    const FString info = FString::Printf(TEXT("Z形轨迹记录: 报告时间戳=%lld"), stampNum);
+    UE_LOG(LogTemp, Log, TEXT("%s"), *info);
+}
+
+void UCommandResolver::OnZShapeTrajectoryAnalysis_Result(const TSharedPtr<FJsonObject>& json)
+{
+    const TSharedPtr<FJsonObject>* dataPtr = nullptr;
+    if (!json.IsValid() || !json->TryGetObjectField(TEXT("data"), dataPtr) || !(dataPtr && dataPtr->IsValid()))
+    {
+        const FString warn = TEXT("OnZShapeTrajectoryAnalysis_Result: invalid data");
+        UE_LOG(LogTemp, Warning, TEXT("%s"), *warn);
+        onMessageUpdate.Broadcast(warn, EMessageType::Message);
+        return;
+    }
+
+    const bool isFinish = (*dataPtr)->HasField(TEXT("isFinish")) ? (*dataPtr)->GetBoolField(TEXT("isFinish")) : false;
+    if (isFinish)
+    {
+        const TSharedPtr<FJsonObject>* summaryPtr = nullptr;
+        if ((*dataPtr)->TryGetObjectField(TEXT("summary"), summaryPtr) && summaryPtr && summaryPtr->IsValid())
+        {
+            const bool is1cmFromInjurySite = (*summaryPtr)->HasField(TEXT("is1cmFromInjurySite")) ? (*summaryPtr)->GetBoolField(TEXT("is1cmFromInjurySite")) : false;
+            const bool isZ = (*summaryPtr)->HasField(TEXT("isZ")) ? (*summaryPtr)->GetBoolField(TEXT("isZ")) : false;
+            const bool isInOrder = (*summaryPtr)->HasField(TEXT("isInOrder")) ? (*summaryPtr)->GetBoolField(TEXT("isInOrder")) : false;
+            const double scoreNum = (*summaryPtr)->HasField(TEXT("score")) ? (*summaryPtr)->GetNumberField(TEXT("score")) : 0.0;
+
+            const FString result = FString::Printf(TEXT("是否避开穿刺点1cm: %s\n是否为Z形: %s\n是否为顺时针-逆时针-顺时针: %s\n得分: %.0f，满分100"),
+                is1cmFromInjurySite ? TEXT("是") : TEXT("否"),
+                isZ ? TEXT("是") : TEXT("否"),
+                isInOrder ? TEXT("是") : TEXT("否"),
+                scoreNum);
+
+            UE_LOG(LogTemp, Log, TEXT("%s"), *result);
+            onMessageUpdate.Broadcast(result, EMessageType::AnalysisResult);
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Log, TEXT("Z形轨迹记录: 未完成"));
+        onMessageUpdate.Broadcast(TEXT("Z形轨迹记录: 未完成"), EMessageType::AnalysisResult);
+    }
 }

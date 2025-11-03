@@ -20,7 +20,8 @@ enum class EPicoType : uint8 {
 UENUM(BlueprintType)
 enum class EMotionType : uint8 {
 	Trajectory,
-	Cpr
+	Cpr,
+	ZShape
 };
 
 /*
