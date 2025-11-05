@@ -297,6 +297,7 @@ bool ThreadDispatcher::SendString(const FString& message)
             UE_LOG(LogTemp, Error, TEXT("Send failed: invalid address %s"), *address);
             FString msg = FString::Printf(TEXT("Send failed: invalid address %s"), *address);;
             AsyncTask(ENamedThreads::GameThread, [text = msg]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 0.016f, FColor::Yellow, text); });
+            shouldStop = true;
             return false;
         }
         remoteAddr = remoteAddress;
@@ -308,6 +309,7 @@ bool ThreadDispatcher::SendString(const FString& message)
             UE_LOG(LogTemp, Warning, TEXT("UDP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
             FString msg = FString::Printf(TEXT("UDP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
             AsyncTask(ENamedThreads::GameThread, [text = msg]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 0.016f, FColor::Yellow, text); });
+            shouldStop = true;
             return false;
         }
         return true;
@@ -320,6 +322,7 @@ bool ThreadDispatcher::SendString(const FString& message)
             UE_LOG(LogTemp, Warning, TEXT("TCP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
             FString msg = FString::Printf(TEXT("TCP send partial or failed. Sent=%d, Total=%d"), sent, bytesToSend);
             AsyncTask(ENamedThreads::GameThread, [text = msg]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 0.016f, FColor::Yellow, text); });
+            shouldStop = true;
             return false;
         }
         return true;

@@ -158,6 +158,8 @@ void APBConnector::EnqueueJson(const FString& jsonString)
     FString payload = jsonString;
 	payload.ReplaceInline(TEXT("\r"), TEXT(""));
 	payload.ReplaceInline(TEXT("\n"), TEXT(""));
+	payload.ReplaceInline(TEXT(" "), TEXT(""));
+	payload.ReplaceInline(TEXT("\t"), TEXT(""));
     if (!payload.EndsWith(TEXT("\r\n")))
     {
         while (payload.Len() > 0 && (payload.EndsWith(TEXT("\r")) || payload.EndsWith(TEXT("\n"))))
