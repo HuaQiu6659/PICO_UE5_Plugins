@@ -25,6 +25,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Motion")
 		FString GetBizId() { return currentBizId; }
 
+
 	UPROPERTY(BlueprintAssignable, Category="Motion")
 		FMessageDelegate onMessageUpdate;
 
@@ -33,6 +34,8 @@ public:
 
 	void Resolve(const FString& json);
 	EMotionType GetCurrentMode() { return currentMode; }
+	void SetAnalyzing(bool analyzing) { isAnalyzing = analyzing; }
+	bool IsAnalyzing() { return isAnalyzing; }
 
 private:
 	static const int32 SUCCESS_CODE = 1000;
@@ -41,6 +44,7 @@ private:
 	FCriticalSection idMapMutex;
 	EMotionType currentMode;
 	FString currentBizId;
+	bool isAnalyzing;
 
 	void OnRescueAppConfig(const TSharedPtr<FJsonObject>& json);
 

@@ -237,7 +237,7 @@ void ThreadDispatcher::NewData(int32 bytesRead)
 
 	FString processArea = receiveBuffer.Left(lastNewlineIdx + 1);
 	receiveBuffer = receiveBuffer.Mid(lastNewlineIdx + 1);
-    AsyncTask(ENamedThreads::GameThread, [text = processArea]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 1, FColor::White, text); });
+    //AsyncTask(ENamedThreads::GameThread, [text = processArea]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 1, FColor::White, text); });
 
 	TArray<FString> lines;
 	processArea.ParseIntoArray(lines, TEXT("\n"), false);

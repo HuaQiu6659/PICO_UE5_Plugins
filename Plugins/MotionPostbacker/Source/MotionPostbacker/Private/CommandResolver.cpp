@@ -4,6 +4,7 @@
 #include "Json.h"
 #include "JsonUtilities.h"
 #include "Misc/ScopeLock.h"
+#include "Engine/Engine.h"
 
 UCommandResolver* UCommandResolver::Instance = nullptr;
 
@@ -121,6 +122,7 @@ void UCommandResolver::OnTrajectoryAnalysis_Begin(const TSharedPtr<FJsonObject>&
         onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
+    isAnalyzing = true;
     (*dataPtr)->TryGetStringField(TEXT("bizId"), currentBizId);
     currentMode = EMotionType::Trajectory;
     UE_LOG(LogTemp, Log, TEXT("无菌钳轨迹分析: 已开始"));
@@ -170,6 +172,18 @@ void UCommandResolver::OnTrajectoryAnalysis_Result(const TSharedPtr<FJsonObject>
                 sphereDiameter, score);
 
             UE_LOG(LogTemp, Log, TEXT("%s"), *result);
+            //if (GEngine)
+            //{
+            //    // 在屏幕上显示分析结果 5 秒，便于用户查看
+            //    GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, result);
+            //    // 同时显示对应的 JSON 字符串 5 秒
+            //    FString jsonText;
+            //    {
+            //        TSharedRef<TJsonWriter<TCHAR>> writer = TJsonWriterFactory<TCHAR>::Create(&jsonText);
+            //        FJsonSerializer::Serialize(json.ToSharedRef(), writer);
+            //    }
+            //    GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan, jsonText);
+            //}
             onMessageUpdate.Broadcast(result, EMessageType::AnalysisResult);
         }
     }
@@ -200,7 +214,7 @@ void UCommandResolver::OnCprAnalysis(const TSharedPtr<FJsonObject>& json)
     {
         if (action.Equals(TEXT("begin"), ESearchCase::IgnoreCase)) 
             OnCprAnalysis_Begin(json);
-        else if (action.Equals(TEXT("end"), ESearchCase::IgnoreCase)) 
+        else if (action.Equals(TEXT("stop"), ESearchCase::IgnoreCase)) 
             OnCprAnalysis_End(json);
         else if (action.Equals(TEXT("result"), ESearchCase::IgnoreCase))
             OnCprAnalysis_Result(json);
@@ -271,6 +285,18 @@ void UCommandResolver::OnCprAnalysis_Result(const TSharedPtr<FJsonObject>& json)
                 scoreNum);
 
             UE_LOG(LogTemp, Log, TEXT("%s"), *result);
+            //if (GEngine)
+            //{
+            //    // 在屏幕上显示 CPR 结果 5 秒
+            //    GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, result);
+            //    // 同时显示对应的 JSON 字符串 5 秒
+            //    FString jsonText;
+            //    {
+            //        TSharedRef<TJsonWriter<TCHAR>> writer = TJsonWriterFactory<TCHAR>::Create(&jsonText);
+            //        FJsonSerializer::Serialize(json.ToSharedRef(), writer);
+            //    }
+            //    GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan, jsonText);
+            //}
             onMessageUpdate.Broadcast(result, EMessageType::AnalysisResult);
         }
     }
@@ -331,6 +357,7 @@ void UCommandResolver::OnZShapeTrajectoryAnalysis_Begin(const TSharedPtr<FJsonOb
         onMessageUpdate.Broadcast(warn, EMessageType::Message);
         return;
     }
+    isAnalyzing = true;
     (*dataPtr)->TryGetStringField(TEXT("bizId"), currentBizId);
     currentMode = EMotionType::ZShape;
     const FString info = FString::Printf(TEXT("Z形轨迹分析: 已开始"), *currentBizId);
@@ -380,6 +407,18 @@ void UCommandResolver::OnZShapeTrajectoryAnalysis_Result(const TSharedPtr<FJsonO
                 scoreNum);
 
             UE_LOG(LogTemp, Log, TEXT("%s"), *result);
+            //if (GEngine)
+            //{
+            //    // 在屏幕上显示 Z 形轨迹结果 5 秒
+            //    GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, result);
+            //    // 同时显示对应的 JSON 字符串 5 秒
+            //    FString jsonText;
+            //    {
+            //        TSharedRef<TJsonWriter<TCHAR>> writer = TJsonWriterFactory<TCHAR>::Create(&jsonText);
+            //        FJsonSerializer::Serialize(json.ToSharedRef(), writer);
+            //    }
+            //    GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan, jsonText);
+            //}
             onMessageUpdate.Broadcast(result, EMessageType::AnalysisResult);
         }
     }
