@@ -11,6 +11,7 @@
 #include "Enums.h"
 #include "CommandResolver.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FAnalysisStateDelegate, bool, isAnalyzing);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FMessageDelegate, const FString&, message, EMessageType, messageType);
 
 UCLASS()
@@ -26,6 +27,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category="Motion")
 		FMessageDelegate onMessageUpdate;
+
+	UPROPERTY(BlueprintAssignable, Category = "Motion")
+		FAnalysisStateDelegate onAnalysisStateChanged;
 
 	void Resolve(const FString& json);
 	EMotionType GetCurrentMode() { return currentMode; }

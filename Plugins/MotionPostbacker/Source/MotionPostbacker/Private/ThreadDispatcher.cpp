@@ -142,6 +142,17 @@ void ThreadDispatcher::TcpRecv()
 	uint32 size;
     while (!shouldStop)
     {
+        // 实时检测连接状态，服务端关闭时及时退出循环并更新状态
+        const ESocketConnectionState connState = socket->GetConnectionState();
+        if (connState != ESocketConnectionState::SCS_Connected)
+        {
+            connected = false;
+            UE_LOG(LogTemp, Warning, TEXT("Tcp disconnected: %s:%d"), *address, port);
+            FString msg = FString::Printf(TEXT("Tcp disconnected: %s:%d"), *address, port);
+            AsyncTask(ENamedThreads::GameThread, [text = msg]() { if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Yellow, text); });
+            break;
+        }
+
         if (!socket->HasPendingData(size))
         {
             // 无数据时短暂休眠，避免忙等导致高 CPU 或在安卓上触发异常

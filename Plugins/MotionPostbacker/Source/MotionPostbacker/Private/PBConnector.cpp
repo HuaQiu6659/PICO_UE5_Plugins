@@ -49,7 +49,14 @@ void APBConnector::Tick(float DeltaTime)
 		}
 	}
 	else
-		connectedNotified = false;
+	{
+		// 如果之前已经通知为连接成功，而当前检测到未连接，则广播断开状态
+		if (connectedNotified)
+		{
+			onConnectorStateChanged.Broadcast(EConnectorState::Unconnect);
+			connectedNotified = false;
+		}
+	}
 }
 
 void APBConnector::TryConnectServer(const FString& address, int32 port, bool useUdp, bool logMessage)
