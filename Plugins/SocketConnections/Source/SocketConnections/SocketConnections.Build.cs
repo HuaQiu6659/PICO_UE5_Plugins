@@ -2,9 +2,9 @@
 
 using UnrealBuildTool;
 
-public class MotionPostbacker : ModuleRules
+public class SocketConnections : ModuleRules
 {
-	public MotionPostbacker(ReadOnlyTargetRules Target) : base(Target)
+	public SocketConnections(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
@@ -26,13 +26,6 @@ public class MotionPostbacker : ModuleRules
 			new string[]
 			{
 				"Core",
-                "CoreUObject",
-                "Engine",
-                "InputCore",
-                "Sockets",
-                "Networking",
-                "JsonUtilities",
-                "SocketConnections"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -45,7 +38,8 @@ public class MotionPostbacker : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
-                "Json",
+				"Sockets",
+				"Networking",
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

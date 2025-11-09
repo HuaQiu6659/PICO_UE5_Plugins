@@ -8,7 +8,7 @@
 
 UCommandResolver* UCommandResolver::Instance = nullptr;
 
-UCommandResolver* UCommandResolver::GetInstance()
+UCommandResolver* UCommandResolver::GetResolver()
 {
     if (!Instance || !IsValid(Instance))
     {
@@ -18,14 +18,110 @@ UCommandResolver* UCommandResolver::GetInstance()
     return Instance;
 }
 
+// 从缓冲区中提取下一个完整的 JSON 对象（按花括号配平，忽略字符串中的括号与转义）
+static int32 FindJsonObjectEnd(const FString& s, int32 startIndex)
+{
+    int32 depth = 0;
+    bool inString = false;
+    bool escapeNext = false;
+    for (int32 i = startIndex; i < s.Len(); i++)
+    {
+        const TCHAR ch = s[i];
+        if (escapeNext)
+        {
+            escapeNext = false;
+            continue;
+        }
+
+        if (ch == '\\')
+        {
+            escapeNext = true;
+            continue;
+        }
+
+        if (ch == '"')
+        {
+            inString = !inString;
+            continue;
+        }
+
+        if (inString)
+            continue;
+
+        if (ch == '{') depth++;
+        else if (ch == '}')
+        {
+            depth--;
+            if (depth == 0) return i;
+        }
+    }
+    return INDEX_NONE;
+}
+
+// 移除缓冲区起始处的噪声（如非打印字符、协议前缀），聚焦到第一个 '{'
+static void stripNonJsonPrefix(FString& buffer)
+{
+    buffer.TrimStartInline();
+    const int32 startBrace = buffer.Find(TEXT("{"));
+    if (startBrace == INDEX_NONE)
+    {
+        // 没有 '{'，保留少量噪声等待下一次数据；避免无限增长
+        if (buffer.Len() > 4096) buffer.Reset();
+        return;
+    }
+    if (startBrace > 0) buffer.RemoveAt(0, startBrace);
+}
+
+static bool ExtractNextJsonObject(FString& buffer, FString& outObject)
+{
+    stripNonJsonPrefix(buffer);
+    if (buffer.IsEmpty()) return false;
+
+    // 现在起始应为 '{'，寻找配平的结束下标
+    const int32 end = FindJsonObjectEnd(buffer, 0);
+    if (end == INDEX_NONE) return false; // 半包，等待下一次补齐
+
+    outObject = buffer.Left(end + 1);
+    buffer.RemoveAt(0, end + 1);
+    buffer.TrimStartInline(); // 去除分隔符/空白
+    return true;
+}
+
 void UCommandResolver::Resolve(const FString& json)
+{
+    // 粘包与半包处理：
+    // 1) 累积到缓冲区。
+    // 2) 通过花括号配平提取完整 JSON 对象，忽略字符串中的括号与转义，
+    //    同时剔除前导噪声（如非打印字符、协议前缀）。
+    // 3) 未配平的残缺数据保留在缓冲区，等待下一次补齐。
+    recvBuffer.Append(json);
+
+    FString packet;
+    while (ExtractNextJsonObject(recvBuffer, packet))
+    {
+        packet.TrimStartAndEndInline();
+        if (packet.IsEmpty()) continue;
+        ResolveOne(packet);
+    }
+
+    // 可选的保护：缓冲区过大（异常数据或服务端错误）时清空并提醒
+    if (recvBuffer.Len() > 1 * 1024 * 1024)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Resolve: 缓冲区超过 1MB，疑似异常数据，清空缓冲。"));
+        recvBuffer.Reset();
+    }
+}
+
+// 处理单条 JSON 指令
+void UCommandResolver::ResolveOne(const FString& json)
 {
     TSharedPtr<FJsonObject> jsonObject;
     TSharedRef<TJsonReader<TCHAR>> reader = TJsonReaderFactory<TCHAR>::Create(json);
     if (!FJsonSerializer::Deserialize(reader, jsonObject) || !jsonObject.IsValid())
     {
         FString err = FString::Printf(TEXT("Resolve: 无法解析为合法的 JSON: %s"), *json);
-        onMessageUpdate.Broadcast(err, EMessageType::Message);  //TODO: 只打印, 不广播
+        // 只打印，不广播到 UI
+        UE_LOG(LogTemp, Warning, TEXT("%s"), *err);
         return;
     }
 

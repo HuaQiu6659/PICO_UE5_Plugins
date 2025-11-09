@@ -19,12 +19,11 @@ class MOTIONPOSTBACKER_API UCommandResolver : public UObject
 {
 	GENERATED_BODY()
 public:
-	UFUNCTION(BlueprintCallable, Category = "Motion")
-		static UCommandResolver* GetInstance();
+	UFUNCTION(BlueprintPure, Category = "Motion")
+		static UCommandResolver* GetResolver();
 
     UFUNCTION(BlueprintCallable, Category = "Motion")
 		FString GetBizId() { return currentBizId; }
-
 
 	UPROPERTY(BlueprintAssignable, Category="Motion")
 		FMessageDelegate onMessageUpdate;
@@ -32,14 +31,21 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Motion")
 		FAnalysisStateDelegate onAnalysisStateChanged;
 
-	void Resolve(const FString& json);
-	EMotionType GetCurrentMode() { return currentMode; }
+	UFUNCTION(BlueprintCallable, Category = "Motion")
+		void Resolve(const FString& json);
+
 	void SetAnalyzing(bool analyzing) { isAnalyzing = analyzing; }
+	EMotionType GetCurrentMode() { return currentMode; }
 	bool IsAnalyzing() { return isAnalyzing; }
 
 private:
-	static const int32 SUCCESS_CODE = 1000;
-	static UCommandResolver* Instance;
+    // 处理单条 JSON 指令（已按粘包拆分后的一个包）
+    void ResolveOne(const FString& json);
+    // 粘包处理缓冲区：累积未完整的包体，待下次补齐后再解析
+    FString recvBuffer;
+
+    static const int32 SUCCESS_CODE = 1000;
+    static UCommandResolver* Instance;
 
 	FCriticalSection idMapMutex;
 	EMotionType currentMode;

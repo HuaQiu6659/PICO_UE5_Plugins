@@ -6,10 +6,19 @@
 #include "Json.h"
 #include "JsonUtilities.h"
 
-const FString& CommandBuilder::GlobalConfigCommand(const FString& clipperSn, const FString& dummySn)
+static void CleanJson(FString& s)
 {
-	static FString cachedJson;
-	cachedJson.Empty();
+	s.ReplaceInline(TEXT("\r"), TEXT(""));
+	s.ReplaceInline(TEXT("\n"), TEXT(""));
+    s.ReplaceInline(TEXT("\t"), TEXT(""));
+
+    if (!s.EndsWith(TEXT("\r\n")))
+		s.Append(TEXT("\r\n"));
+}
+
+FString UCommandBuilder::GlobalConfigCommand(const FString& clipperSn, const FString& dummySn)
+{
+    FString outJson;
 
 	TSharedPtr<FJsonObject> root = MakeShareable(new FJsonObject());
 	root->SetStringField(TEXT("cmd"), TEXT("rescueAppConfig"));
@@ -18,15 +27,15 @@ const FString& CommandBuilder::GlobalConfigCommand(const FString& clipperSn, con
 	root->SetStringField(TEXT("asepticClipper"), clipperSn);
 	root->SetStringField(TEXT("dummy"), dummySn);
 
-	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&cachedJson);
-	FJsonSerializer::Serialize(root.ToSharedRef(), Writer);
-	return cachedJson;
+    TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&outJson);
+    FJsonSerializer::Serialize(root.ToSharedRef(), Writer);
+    CleanJson(outJson);
+    return outJson;
 }
 
-const FString& CommandBuilder::StartCommand(EMotionType motionType)
+FString UCommandBuilder::StartCommand(EMotionType motionType)
 {
-	static FString cachedJson;
-	cachedJson.Empty();
+	FString outJson;
 
 	TSharedPtr<FJsonObject> root = MakeShareable(new FJsonObject());
 
@@ -45,7 +54,7 @@ const FString& CommandBuilder::StartCommand(EMotionType motionType)
 	default:
 		UE_LOG(LogTemp, Error, TEXT("StartCommand: unknown motion type %d"), (int32)motionType);
 		root->SetStringField(TEXT("cmd"), TEXT("unknown"));
-		return cachedJson;
+		return outJson;
 	}
 
 	// action
@@ -55,22 +64,22 @@ const FString& CommandBuilder::StartCommand(EMotionType motionType)
 	const int64 timestampMs = static_cast<int64>((FDateTime::UtcNow() - FDateTime(1970,1,1)).GetTotalMilliseconds());
 	root->SetNumberField(TEXT("stamp"), (double)timestampMs);
 
-	TSharedRef<TJsonWriter<>> writer = TJsonWriterFactory<>::Create(&cachedJson);
-	FJsonSerializer::Serialize(root.ToSharedRef(), writer);
-	return cachedJson;
+    TSharedRef<TJsonWriter<>> writer = TJsonWriterFactory<>::Create(&outJson);
+    FJsonSerializer::Serialize(root.ToSharedRef(), writer);
+    CleanJson(outJson);
+    return outJson;
 }
 
-const FString& CommandBuilder::EndCommand(EMotionType motionType)
+FString UCommandBuilder::EndCommand(EMotionType motionType)
 {
-	static FString cachedJson;
+	FString outJson;
 
 	TSharedPtr<FJsonObject> root = MakeShareable(new FJsonObject());
-	UCommandResolver* resolver = UCommandResolver::GetInstance();
+	UCommandResolver* resolver = UCommandResolver::GetResolver();
 	const FString bizId = resolver ? resolver->GetBizId() : FString();
 	if (bizId.IsEmpty())
 	{
-		cachedJson.Empty();
-		return cachedJson;
+		return outJson;
 	}
 	root->SetStringField(TEXT("bizId"), bizId);
 
@@ -101,22 +110,21 @@ const FString& CommandBuilder::EndCommand(EMotionType motionType)
 	const int64 TimestampMs = static_cast<int64>((FDateTime::UtcNow() - FDateTime(1970,1,1)).GetTotalMilliseconds());
 	root->SetNumberField(TEXT("stamp"), (double)TimestampMs);
 
-	cachedJson.Empty();
-	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&cachedJson);
-	FJsonSerializer::Serialize(root.ToSharedRef(), Writer);
-	return cachedJson;
+    TSharedRef<TJsonWriter<>> writer2 = TJsonWriterFactory<>::Create(&outJson);
+    FJsonSerializer::Serialize(root.ToSharedRef(), writer2);
+    CleanJson(outJson);
+    return outJson;
 }
 
-const FString& CommandBuilder::AnalysisCommand(EMotionType motionType)
+FString UCommandBuilder::AnalysisCommand(EMotionType motionType)
 {
-	static FString cachedJson;
-	cachedJson.Empty();
+	FString outJson;
 
 	TSharedPtr<FJsonObject> root = MakeShareable(new FJsonObject());
-	UCommandResolver* resolver = UCommandResolver::GetInstance();
+	UCommandResolver* resolver = UCommandResolver::GetResolver();
 	const FString bizId = resolver ? resolver->GetBizId() : FString();
 	if (bizId.IsEmpty())
-		return cachedJson;
+		return outJson;
 
 	root->SetStringField(TEXT("bizId"), bizId);
 
@@ -133,26 +141,26 @@ const FString& CommandBuilder::AnalysisCommand(EMotionType motionType)
 			root->SetStringField(TEXT("cmd"), TEXT("zshapeTrajefctoryAnalysis"));
 			break;
 		default:
-			return cachedJson;
+			return outJson;
 	}
 
 	// action
 	root->SetStringField(TEXT("action"), TEXT("result"));
 
-	TSharedRef<TJsonWriter<>> writer = TJsonWriterFactory<>::Create(&cachedJson);
-	FJsonSerializer::Serialize(root.ToSharedRef(), writer);
-	return cachedJson;
+    TSharedRef<TJsonWriter<>> writer = TJsonWriterFactory<>::Create(&outJson);
+    FJsonSerializer::Serialize(root.ToSharedRef(), writer);
+    CleanJson(outJson);
+    return outJson;
 }
 
-const FString& CommandBuilder::TrackerDatas(const TArray<FTrackerData>& trackers)
+FString UCommandBuilder::TrackerDatas(const TArray<FTrackerData>& trackers)
 {
-	static FString cachedJson;
-	cachedJson.Empty();
+	FString outJson;
 
-	auto resolver = UCommandResolver::GetInstance();
+	auto resolver = UCommandResolver::GetResolver();
 #if !WITH_EDITOR
-	if (!resolver->IsAnalyzing())
-		return cachedJson;
+    if (!resolver->IsAnalyzing())
+		return outJson;
 #endif
 
 	TSharedPtr<FJsonObject> root = MakeShareable(new FJsonObject());
@@ -172,11 +180,11 @@ const FString& CommandBuilder::TrackerDatas(const TArray<FTrackerData>& trackers
 		break;
 
 	default:
-		return cachedJson;
+		return outJson;
 	}
 	const FString bizId = resolver ? resolver->GetBizId() : FString();
 	if (bizId.IsEmpty())
-		return cachedJson;
+		return outJson;
 	root->SetStringField(TEXT("bizId"), bizId);
 #endif
 
@@ -236,7 +244,8 @@ const FString& CommandBuilder::TrackerDatas(const TArray<FTrackerData>& trackers
 	}
 
 	root->SetArrayField(TEXT("trackerList"), trackersArray);
-	TSharedRef<TJsonWriter<>> writer = TJsonWriterFactory<>::Create(&cachedJson);
-	FJsonSerializer::Serialize(root.ToSharedRef(), writer);
-	return cachedJson;
+    TSharedRef<TJsonWriter<>> writer = TJsonWriterFactory<>::Create(&outJson);
+    FJsonSerializer::Serialize(root.ToSharedRef(), writer);
+    CleanJson(outJson);
+    return outJson;
 }

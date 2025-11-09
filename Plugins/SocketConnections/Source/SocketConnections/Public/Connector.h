@@ -1,0 +1,79 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "Connector.generated.h"
+
+// 连接状态枚举：用于通过委托通知上层连接状态改变
+UENUM(BlueprintType)
+enum class ESocketState : uint8
+{
+	Unconnect,
+	Connecting,
+	Connected
+};
+
+// 当收到服务端消息时广播（已在游戏线程触发，安全可用于 UI）
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMessageReceived, const FString&, message);
+
+// 当连接状态变化时广播（已在游戏线程触发）
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConnectorStateChanged, ESocketState, state);
+
+UCLASS()
+class SOCKETCONNECTIONS_API AConnector : public AActor
+{
+	GENERATED_BODY()
+	
+public:	
+	// Sets default values for this actor's properties
+	AConnector();
+
+protected:
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;
+
+public:	
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
+
+public:
+	// 当收到服务端消息时广播（已在游戏线程触发，安全可用于 UI）
+	UPROPERTY(BlueprintAssignable)
+	FOnMessageReceived onMessageReceived;
+
+	// 当连接状态变化时广播（已在游戏线程触发）
+	UPROPERTY(BlueprintAssignable)
+	FOnConnectorStateChanged onConnectorStateChanged;
+
+	// 尝试连接到服务端（可在蓝图调用）。address 示例："127.0.0.1"，端口范围 1-65535
+	UFUNCTION(BlueprintCallable, Category="SocketConnections")
+	void TryConnectServer(const FString& address, int32 port, bool useUdp);
+
+	// 发送字符串到服务端（可在蓝图调用）。返回是否发送成功
+	UFUNCTION(BlueprintCallable, Category="SocketConnections")
+	bool SendString(const FString& message);
+
+	// 停止并释放连接资源（可在蓝图调用）
+	UFUNCTION(BlueprintCallable, Category="SocketConnections")
+	void Stop();
+
+	// 查询当前是否已连接（可在蓝图查询）
+	UFUNCTION(BlueprintPure, Category="SocketConnections")
+	bool IsConnected() const;
+
+private:
+	// 线程对象与工作者，用于后台接收数据；注意只在主线程创建与销毁
+	class FSocketWorker* worker;
+	class FRunnableThread* thread;
+
+	// 连接参数（最新一次调用 TryConnectServer 设置）
+	FString connectAddress;
+	int32 connectPort;
+	bool useUdp;
+
+	// 发送互斥，保护 socket 发送并发
+	FCriticalSection sendMutex;
+
+};

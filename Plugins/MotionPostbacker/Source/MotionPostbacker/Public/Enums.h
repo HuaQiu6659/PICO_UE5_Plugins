@@ -25,17 +25,6 @@ enum class EMotionType : uint8 {
 };
 
 /*
- * 连接状态
- */
-UENUM(BlueprintType)
-enum class EConnectorState : uint8 {
-	Unconnect,
-	Connecting,
-	Connected
-};
-
-
-/*
  * 消息类型
  */
 UENUM(BlueprintType)
