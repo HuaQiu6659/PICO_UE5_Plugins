@@ -90,10 +90,6 @@ static bool ExtractNextJsonObject(FString& buffer, FString& outObject)
 void UCommandResolver::Resolve(const FString& json)
 {
     // 粘包与半包处理：
-    // 1) 累积到缓冲区。
-    // 2) 通过花括号配平提取完整 JSON 对象，忽略字符串中的括号与转义，
-    //    同时剔除前导噪声（如非打印字符、协议前缀）。
-    // 3) 未配平的残缺数据保留在缓冲区，等待下一次补齐。
     recvBuffer.Append(json);
 
     FString packet;
@@ -104,7 +100,7 @@ void UCommandResolver::Resolve(const FString& json)
         ResolveOne(packet);
     }
 
-    // 可选的保护：缓冲区过大（异常数据或服务端错误）时清空并提醒
+    // 缓冲区过大（异常数据或服务端错误）时清空并提醒
     if (recvBuffer.Len() > 1 * 1024 * 1024)
     {
         UE_LOG(LogTemp, Warning, TEXT("Resolve: 缓冲区超过 1MB，疑似异常数据，清空缓冲。"));
@@ -120,7 +116,6 @@ void UCommandResolver::ResolveOne(const FString& json)
     if (!FJsonSerializer::Deserialize(reader, jsonObject) || !jsonObject.IsValid())
     {
         FString err = FString::Printf(TEXT("Resolve: 无法解析为合法的 JSON: %s"), *json);
-        // 只打印，不广播到 UI
         UE_LOG(LogTemp, Warning, TEXT("%s"), *err);
         return;
     }

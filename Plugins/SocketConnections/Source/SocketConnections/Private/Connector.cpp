@@ -66,8 +66,12 @@ public:
             return false;
 
         FScopeLock scopeLock(&socketMutex);
-        if (!socket || !connected)
+        if (!socket || !connected) 
+        {
+            UE_LOG(LogSocketConnections, Warning, TEXT("TCP Send 失败: Socket未连接"));
+            BroadcastError(TEXT("发送失败：Socket 未连接"));
             return false;
+        }
 
         FTCHARToUTF8 converter(*message);
         int32 bytesSent = 0;
@@ -75,13 +79,20 @@ public:
         {
             if (!remoteAddr.IsValid())
             {
+                BroadcastError(TEXT("发送失败：UDP 远端地址无效"));
                 return false;
             }
-            return socket->SendTo((uint8*)converter.Get(), converter.Length(), bytesSent, *remoteAddr) && bytesSent > 0;
+            const bool ok = socket->SendTo((uint8*)converter.Get(), converter.Length(), bytesSent, *remoteAddr) && bytesSent > 0;
+            if (!ok) 
+                BroadcastError(TEXT("UDP 发送失败"));
+
+            return ok;
         }
         else
         {
-            return socket->Send((uint8*)converter.Get(), converter.Length(), bytesSent) && bytesSent > 0;
+            const bool ok = socket->Send((uint8*)converter.Get(), converter.Length(), bytesSent) && bytesSent > 0;
+            if (!ok) BroadcastError(TEXT("TCP 发送失败"));
+            return ok;
         }
     }
 
@@ -104,6 +115,7 @@ private:
         ISocketSubsystem* s = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
         if (!s)
         {
+            BroadcastError(TEXT("当前平台的 SocketSubsystem 不可用"));
             BroadcastState(ESocketState::Unconnect);
             return;
         }
@@ -114,6 +126,7 @@ private:
         addr->SetPort(port);
         if (!ipOk)
         {
+            BroadcastError(FString::Printf(TEXT("非法 IP 地址: %s:%d"), *address, port));
             BroadcastState(ESocketState::Unconnect);
             return;
         }
@@ -122,6 +135,7 @@ private:
         socket = s->CreateSocket(NAME_Stream, TEXT("SocketConnectionsTCP"), false);
         if (!socket)
         {
+            BroadcastError(TEXT("CreateSocket 失败"));
             BroadcastState(ESocketState::Unconnect);
             return;
         }
@@ -162,6 +176,7 @@ private:
                 {
                     const ESocketErrors lastError = s->GetLastErrorCode();
                     UE_LOG(LogSocketConnections, Warning, TEXT("TCP 握手错误(lastError=%d)，断开：%s:%d"), (int32)lastError, *address, port);
+                    BroadcastError(FString::Printf(TEXT("TCP 握手错误，错误码=%d"), (int32)lastError));
                     BroadcastState(ESocketState::Unconnect);
                     CloseSocket();
                     return;
@@ -174,6 +189,7 @@ private:
                 // 超时未连接（通常为远端不可达或被防火墙拒绝）
                 const ESocketErrors lastError = s->GetLastErrorCode();
                 UE_LOG(LogSocketConnections, Warning, TEXT("TCP 连接超时(%.2fs)，lastError=%d，断开：%s:%d"), connectTimeoutSec, (int32)lastError, *address, port);
+                BroadcastError(FString::Printf(TEXT("TCP 连接超时(%.2fs)"), connectTimeoutSec, (int32)lastError));
                 BroadcastState(ESocketState::Unconnect);
                 CloseSocket();
                 return;
@@ -191,6 +207,7 @@ private:
             {
                 UE_LOG(LogSocketConnections, Warning, TEXT("TCP 接收循环检测到连接错误，断开：%s:%d"), *address, port);
                 CloseSocket();
+                BroadcastError(TEXT("接收循环检测到连接错误"));
                 BroadcastState(ESocketState::Unconnect);
                 return;
             }
@@ -199,6 +216,7 @@ private:
                 // 已建立连接后出现 NotConnected，通常表示远端优雅断开或连接丢失
                 UE_LOG(LogSocketConnections, Warning, TEXT("TCP 连接丢失(SCS_NotConnected)，断开：%s:%d"), *address, port);
                 CloseSocket();
+                BroadcastError(TEXT("Tcp服务器断开"));
                 BroadcastState(ESocketState::Unconnect);
                 return;
             }
@@ -225,6 +243,7 @@ private:
                 {
                     UE_LOG(LogSocketConnections, Warning, TEXT("TCP 接收到长度为 0 的数据(优雅断开)，断开：%s:%d"), *address, port);
                     CloseSocket();
+                    BroadcastError(TEXT("Tcp服务器断开"));
                     BroadcastState(ESocketState::Unconnect);
                     return;
                 }
@@ -238,6 +257,7 @@ private:
                 {
                     UE_LOG(LogSocketConnections, Warning, TEXT("TCP Recv 返回 false 且 bytesRead==0，判定为远端优雅断开：%s:%d"), *address, port);
                     CloseSocket();
+                    BroadcastError(TEXT("Tcp服务器断开"));
                     BroadcastState(ESocketState::Unconnect);
                     return;
                 }
@@ -249,6 +269,7 @@ private:
                     const ESocketErrors lastError = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->GetLastErrorCode();
                     UE_LOG(LogSocketConnections, Warning, TEXT("TCP Recv 失败后检测到 ConnectionError(lastError=%d)，断开：%s:%d"), (int32)lastError, *address, port);
                     CloseSocket();
+                    BroadcastError(FString::Printf(TEXT("TCP 接收失败，错误码=%d"), (int32)lastError));
                     BroadcastState(ESocketState::Unconnect);
                     return;
                 }
@@ -256,6 +277,7 @@ private:
                 {
                     UE_LOG(LogSocketConnections, Warning, TEXT("TCP Recv 失败后检测到 NotConnected，断开：%s:%d"), *address, port);
                     CloseSocket();
+                    BroadcastError(TEXT("接收失败后检测到 NotConnected"));
                     BroadcastState(ESocketState::Unconnect);
                     return;
                 }
@@ -272,6 +294,7 @@ private:
         ISocketSubsystem* s = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
         if (!s)
         {
+            BroadcastError(TEXT("当前平台Socket 不可用(UDP)"));
             BroadcastState(ESocketState::Unconnect);
             return;
         }
@@ -283,6 +306,7 @@ private:
         remoteAddr->SetPort(port);
         if (!ipOk)
         {
+            BroadcastError(FString::Printf(TEXT("非法 IP 地址(UDP): %s:%d"), *address, port));
             BroadcastState(ESocketState::Unconnect);
             return;
         }
@@ -291,6 +315,7 @@ private:
         socket = s->CreateSocket(NAME_DGram, TEXT("SocketConnectionsUDP"), false);
         if (!socket)
         {
+            BroadcastError(TEXT("CreateSocket 失败(UDP)"));
             BroadcastState(ESocketState::Unconnect);
             return;
         }
@@ -303,6 +328,7 @@ private:
         local->SetPort(port);
         if (!socket->Bind(*local))
         {
+            BroadcastError(TEXT("UDP 绑定端口失败"));
             BroadcastState(ESocketState::Unconnect);
             CloseSocket();
             return;
@@ -372,6 +398,17 @@ private:
         });
     }
 
+    // 在游戏线程广播错误原因
+    void BroadcastError(const FString& reason)
+    {
+        if (!owner)
+            return;
+        AsyncTask(ENamedThreads::GameThread, [o = owner, reason]
+        {
+            o->onConnectorError.Broadcast(reason);
+        });
+    }
+
 private:
     AConnector* owner;
     FString address;
@@ -426,7 +463,11 @@ bool AConnector::SendString(const FString& message)
 {
     FScopeLock scopeLock(&sendMutex);
     if (!worker)
+    {
+        UE_LOG(LogSocketConnections, Warning, TEXT("TCP Send 失败: 未启动工作线程"));
+        onConnectorError.Broadcast(TEXT("发送失败：未连接服务端"));
         return false;
+    }
 
     return worker->SendString(message);
 }

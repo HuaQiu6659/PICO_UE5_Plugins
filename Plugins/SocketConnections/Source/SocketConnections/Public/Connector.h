@@ -21,6 +21,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMessageReceived, const FString&, 
 // 当连接状态变化时广播（已在游戏线程触发）
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConnectorStateChanged, ESocketState, state);
 
+// 当遇到错误时广播错误原因（已在游戏线程触发）
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConnectorError, const FString&, reason);
+
 UCLASS()
 class SOCKETCONNECTIONS_API AConnector : public AActor
 {
@@ -38,7 +41,6 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-public:
 	// 当收到服务端消息时广播（已在游戏线程触发，安全可用于 UI）
 	UPROPERTY(BlueprintAssignable)
 	FOnMessageReceived onMessageReceived;
@@ -46,6 +48,10 @@ public:
 	// 当连接状态变化时广播（已在游戏线程触发）
 	UPROPERTY(BlueprintAssignable)
 	FOnConnectorStateChanged onConnectorStateChanged;
+
+	// 当遇到错误时广播（蓝图可绑定），会携带错误原因字符串
+	UPROPERTY(BlueprintAssignable)
+	FOnConnectorError onConnectorError;
 
 	// 尝试连接到服务端（可在蓝图调用）。address 示例："127.0.0.1"，端口范围 1-65535
 	UFUNCTION(BlueprintCallable, Category="SocketConnections")
