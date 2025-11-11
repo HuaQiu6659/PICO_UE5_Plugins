@@ -37,7 +37,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Motion")
 		void Resolve(const FString& json);
 
-	void SetAnalyzing(bool analyzing) { isAnalyzing = analyzing; }
+	UFUNCTION(BlueprintCallable, Category = "Motion")
+		void SetAnalyzing(bool analyzing) { isAnalyzing = analyzing; }
 	EMotionType GetCurrentMode() { return currentMode; }
 	bool IsAnalyzing() { return isAnalyzing; }
 
