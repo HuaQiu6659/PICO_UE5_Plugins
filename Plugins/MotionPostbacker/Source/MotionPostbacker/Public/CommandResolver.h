@@ -25,6 +25,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Motion")
 		FString GetBizId() { return currentBizId; }
 
+	UFUNCTION(BlueprintCallable, Category = "Motion")
+		bool ShouldSendTrackerData();
+
 	UPROPERTY(BlueprintAssignable, Category="Motion")
 		FMessageDelegate onMessageUpdate;
 
@@ -49,8 +52,8 @@ private:
 
 	FCriticalSection idMapMutex;
 	EMotionType currentMode;
-	FString currentBizId;
 	bool isAnalyzing;
+	FString currentBizId;
 
 	void OnRescueAppConfig(const TSharedPtr<FJsonObject>& json);
 

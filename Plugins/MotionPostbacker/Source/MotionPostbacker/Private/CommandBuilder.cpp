@@ -76,10 +76,15 @@ FString UCommandBuilder::EndCommand(EMotionType motionType)
 
 	TSharedPtr<FJsonObject> root = MakeShareable(new FJsonObject());
 	UCommandResolver* resolver = UCommandResolver::GetResolver();
-	const FString bizId = resolver ? resolver->GetBizId() : FString();
+	FString bizId = resolver ? resolver->GetBizId() : FString();
 	if (bizId.IsEmpty())
 	{
+		resolver->onMessageUpdate.Broadcast(FString::Printf(TEXT("未开始分析(bizId为空)\n因此无法发送结束指令")), EMessageType::Message);
+#if WITH_EDITOR
+		bizId = FString::Printf(TEXT("EditorTest"));
+#else
 		return outJson;
+#endif
 	}
 	root->SetStringField(TEXT("bizId"), bizId);
 

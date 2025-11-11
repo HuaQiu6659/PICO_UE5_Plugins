@@ -18,6 +18,11 @@ UCommandResolver* UCommandResolver::GetResolver()
     return Instance;
 }
 
+bool UCommandResolver::ShouldSendTrackerData()
+{
+    return !currentBizId.IsEmpty() && isAnalyzing;
+}
+
 // 从缓冲区中提取下一个完整的 JSON 对象（按花括号配平，忽略字符串中的括号与转义）
 static int32 FindJsonObjectEnd(const FString& s, int32 startIndex)
 {
@@ -59,7 +64,7 @@ static int32 FindJsonObjectEnd(const FString& s, int32 startIndex)
 }
 
 // 移除缓冲区起始处的噪声（如非打印字符、协议前缀），聚焦到第一个 '{'
-static void stripNonJsonPrefix(FString& buffer)
+static void StripNonJsonPrefix(FString& buffer)
 {
     buffer.TrimStartInline();
     const int32 startBrace = buffer.Find(TEXT("{"));
@@ -74,7 +79,7 @@ static void stripNonJsonPrefix(FString& buffer)
 
 static bool ExtractNextJsonObject(FString& buffer, FString& outObject)
 {
-    stripNonJsonPrefix(buffer);
+    StripNonJsonPrefix(buffer);
     if (buffer.IsEmpty()) return false;
 
     // 现在起始应为 '{'，寻找配平的结束下标
@@ -96,7 +101,10 @@ void UCommandResolver::Resolve(const FString& json)
     while (ExtractNextJsonObject(recvBuffer, packet))
     {
         packet.TrimStartAndEndInline();
-        if (packet.IsEmpty()) continue;
+
+        if (packet.IsEmpty()) 
+            continue;
+
         ResolveOne(packet);
     }
 
