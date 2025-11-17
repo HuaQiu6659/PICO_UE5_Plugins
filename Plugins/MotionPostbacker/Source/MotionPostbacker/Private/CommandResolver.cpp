@@ -179,7 +179,7 @@ void UCommandResolver::OnTrajectoryAnalysis(const TSharedPtr<FJsonObject>& json)
     {
         FString result = FString::Printf(TEXT("无菌钳, %s"), *msg);
         UE_LOG(LogTemp, Warning, TEXT("%s"), *result);
-        onMessageUpdate.Broadcast(msg, EMessageType::Message);
+        onMessageUpdate.Broadcast(result, EMessageType::Message);
         return;
     }
 

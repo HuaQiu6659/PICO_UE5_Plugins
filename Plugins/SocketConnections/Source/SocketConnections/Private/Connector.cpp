@@ -141,6 +141,7 @@ private:
         }
         socket->SetNonBlocking(true);
         socket->SetReuseAddr(true);
+        socket->SetNoDelay(true);
 
         // 发起连接并在更长的时间窗口内轮询状态（避免误判慢网络为失败）
         // 注意：非阻塞 connect 返回 false 并不一定是错误，常见为“正在握手”(EWOULDBLOCK/EINPROGRESS)
