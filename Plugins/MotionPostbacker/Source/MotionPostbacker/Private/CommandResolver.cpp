@@ -79,17 +79,23 @@ static void StripNonJsonPrefix(FString& buffer)
 
 static bool ExtractNextJsonObject(FString& buffer, FString& outObject)
 {
-    StripNonJsonPrefix(buffer);
-    if (buffer.IsEmpty()) return false;
+    // 基于换行符 '\n' 的分包重组，兼容 CRLF。若无完整行则等待后续数据。
+    const int32 newlineIndex = buffer.Find(TEXT("\n"));
+    if (newlineIndex == INDEX_NONE) return false;
 
-    // 现在起始应为 '{'，寻找配平的结束下标
-    const int32 end = FindJsonObjectEnd(buffer, 0);
-    if (end == INDEX_NONE) return false; // 半包，等待下一次补齐
+    outObject = buffer.Left(newlineIndex);
+    buffer.RemoveAt(0, newlineIndex + 1);
 
-    outObject = buffer.Left(end + 1);
-    buffer.RemoveAt(0, end + 1);
-    buffer.TrimStartInline(); // 去除分隔符/空白
-    return true;
+    // 去除 Windows 风格结尾的 '\r'
+    if (outObject.Len() > 0 && outObject[outObject.Len() - 1] == '\r')
+        outObject.RemoveAt(outObject.Len() - 1);
+
+    // 兼容可能存在的前置噪声/BOM，保留此前的前缀清理逻辑
+    StripNonJsonPrefix(outObject);
+
+    outObject.TrimStartAndEndInline();
+    buffer.TrimStartInline();
+    return !outObject.IsEmpty();
 }
 
 void UCommandResolver::Resolve(const FString& json)

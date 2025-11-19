@@ -170,29 +170,23 @@ FString UCommandBuilder::TrackerDatas(const TArray<FTrackerData>& trackers)
 
 	TSharedPtr<FJsonObject> root = MakeShareable(new FJsonObject());
 	auto mode = resolver->GetCurrentMode();
-#if WITH_EDITOR	
-	root->SetStringField(TEXT("cmd"), TEXT("trajectoryAnalysis"));
-	root->SetStringField(TEXT("bizId"), TEXT("EDITOR_TEST"));
-#else
 	switch (mode)
 	{
-	case EMotionType::Trajectory:
-		root->SetStringField(TEXT("cmd"), TEXT("trajectoryAnalysis"));
-		break;
+		case EMotionType::Trajectory:
+			root->SetStringField(TEXT("cmd"), TEXT("trajectoryAnalysis"));
+			break;
 
-	case EMotionType::ZShape:
-		root->SetStringField(TEXT("cmd"), TEXT("zshapeTrajectoryAnalysis"));
-		break;
+		case EMotionType::ZShape:
+			root->SetStringField(TEXT("cmd"), TEXT("zshapeTrajectoryAnalysis"));
+			break;
 
-	default:
-		return outJson;
+		default:
+			return outJson;
 	}
 	const FString bizId = resolver ? resolver->GetBizId() : FString();
 	if (bizId.IsEmpty())
 		return outJson;
 	root->SetStringField(TEXT("bizId"), bizId);
-#endif
-
 	root->SetStringField(TEXT("action"), TEXT("trReport"));
 	const int64 TimestampMs = static_cast<int64>((FDateTime::UtcNow() - FDateTime(1970,1,1)).GetTotalMilliseconds());
 	root->SetNumberField(TEXT("stamp"), (double)TimestampMs);
